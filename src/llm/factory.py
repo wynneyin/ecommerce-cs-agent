@@ -14,6 +14,30 @@ from typing import Any
 from src.config import SETTINGS
 
 
+def _chat_openai_cls() -> Any:
+    try:
+        from langchain_openai import ChatOpenAI  # type: ignore
+
+        return ChatOpenAI
+    except ImportError as e:
+        raise ImportError(
+            "缺少依赖 langchain-openai（LLM_PROVIDER=openai/deepseek 时需要）。"
+            "请执行: pip install 'langchain-openai>=0.2.0'"
+        ) from e
+
+
+def _openai_embeddings_cls() -> Any:
+    try:
+        from langchain_openai import OpenAIEmbeddings  # type: ignore
+
+        return OpenAIEmbeddings
+    except ImportError as e:
+        raise ImportError(
+            "缺少依赖 langchain-openai（EMBEDDING_PROVIDER=openai 时需要）。"
+            "请执行: pip install 'langchain-openai>=0.2.0'"
+        ) from e
+
+
 # ---------------------------------------------------------------------------
 # Chat model
 # ---------------------------------------------------------------------------
@@ -27,22 +51,24 @@ def get_chat_model(provider: str | None = None) -> Any:
 
         return FakeChatModel()
     if provider == "openai":
-        from langchain_openai import ChatOpenAI  # type: ignore
+        ChatOpenAI = _chat_openai_cls()
 
         return ChatOpenAI(
             model=SETTINGS.llm_model or "gpt-4o-mini",
             api_key=SETTINGS.llm_api_key or None,
             base_url=SETTINGS.llm_base_url or None,
             temperature=0.2,
+            timeout=120.0,
         )
     if provider == "deepseek":
-        from langchain_openai import ChatOpenAI  # type: ignore
+        ChatOpenAI = _chat_openai_cls()
 
         return ChatOpenAI(
             model=SETTINGS.llm_model or "deepseek-chat",
             api_key=SETTINGS.llm_api_key or None,
             base_url=SETTINGS.llm_base_url or "https://api.deepseek.com/v1",
             temperature=0.2,
+            timeout=120.0,
         )
     if provider == "ollama":
         from langchain_community.chat_models import ChatOllama  # type: ignore
@@ -91,7 +117,7 @@ def get_embeddings(provider: str | None = None) -> Any:
     if provider == "fake":
         return HashEmbeddings()
     if provider == "openai":
-        from langchain_openai import OpenAIEmbeddings  # type: ignore
+        OpenAIEmbeddings = _openai_embeddings_cls()
 
         return OpenAIEmbeddings(
             model=SETTINGS.embedding_model or "text-embedding-3-small",

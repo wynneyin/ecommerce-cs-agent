@@ -12,6 +12,7 @@ Layout (3 columns):
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import uuid
@@ -60,7 +61,7 @@ with st.sidebar:
         index=["fake", "openai", "deepseek", "ollama"].index(SETTINGS.llm_provider)
         if SETTINGS.llm_provider in ("fake", "openai", "deepseek", "ollama")
         else 0,
-        help="切换后请重启应用使其生效;fake 模式无需 API key 即可演示。",
+        help="fake=离线规则；openai/deepseek/ollama 走真实模型。切换后请重启应用。.env 中 LLM_PROVIDER=openai 且 USE_LLM_*=true 时为完整 NLU+思考+合成链路。",
     )
     if llm_choice != SETTINGS.llm_provider:
         os.environ["LLM_PROVIDER"] = llm_choice
@@ -174,6 +175,42 @@ def _render_action_card(action: dict | None) -> None:
     st.json(out)
 
 
+def _stage_display_name(stage: str) -> str:
+    names = {
+        "nlu_primary": "NLU 意图识别（约定输出 JSON）",
+        "nlu_refine": "NLU 兜底纠错（JSON）",
+        "nlu_refine_error": "NLU 调用异常",
+        "think": "Think 推理（自然语言）",
+        "think_error": "Think 调用异常",
+        "reflect": "Reflect 反思（自然语言）",
+        "reflect_error": "Reflect 调用异常",
+        "reply_synthesis": "最终话术合成（自然语言）",
+        "reply_synthesis_error": "话术合成异常",
+    }
+    return names.get(stage, stage)
+
+
+def _render_llm_response_body(stage: str, resp: str) -> None:
+    """NLU steps return JSON by design; others are prose."""
+    if not resp.strip():
+        st.caption("_(空)_")
+        return
+    if stage.startswith("nlu"):
+        st.caption(
+            "这是 **意图识别** 要求的结构化 JSON，不是给用户的聊天正文。"
+            "随意输入常被模型标成 `intent=unknown`，属正常现象；最终回复请看上方气泡。"
+        )
+        try:
+            st.json(json.loads(resp.strip()))
+        except json.JSONDecodeError:
+            st.code(resp, language=None)
+        return
+    if stage.endswith("_error"):
+        st.warning(resp)
+        return
+    st.markdown(resp)
+
+
 def _render_trace(events: list[dict]) -> None:
     if not events:
         st.caption("(empty)")
@@ -191,11 +228,56 @@ def _render_trace(events: list[dict]) -> None:
 
 
 def _render_state_summary(state: dict) -> None:
+    summary_list = state.get("llm_run_summary") or []
+    if summary_list:
+        with st.expander("🔍 本轮 LLM 调用摘录（原始输出，便于排查）", expanded=True):
+            st.caption(
+                "各环节含义不同：**NLU** 固定返回 JSON（intent/slots）；"
+                "**Think / Reflect / 合成** 才是自然语言。"
+                "对用户可见的最终话术以对话气泡为准。"
+                "终端 stderr 可同步查看（`AGENT_LOG_LLM=0` 关闭）。"
+            )
+            for i, ex in enumerate(summary_list, start=1):
+                stage = ex.get("stage", "?")
+                label = _stage_display_name(stage)
+                st.markdown(f"**{i}.** `{stage}` — {label}")
+                hint = ex.get("prompt_hint") or ""
+                if hint.strip():
+                    with st.expander("prompt 摘要", expanded=False):
+                        st.code(hint, language=None)
+                resp = ex.get("response") or ""
+                st.markdown("**模型输出：**")
+                _render_llm_response_body(stage, resp)
+
     cols = st.columns(4)
     cols[0].metric("Intent", state.get("intent", "-"))
     cols[1].metric("Conf", f"{state.get('intent_conf', 0):.2f}")
     cols[2].metric("Retrieval", state.get("retrieval_method") or "-")
     cols[3].metric("Mode", state.get("mode") or "-")
+    think_rounds = (state.get("memory_working") or {}).get("think_rounds")
+    if think_rounds:
+        with st.expander("Think 推理（多轮 plan 前）", expanded=False):
+            for i, t in enumerate(think_rounds, start=1):
+                st.markdown(f"**第 {i} 轮**\n\n{t}")
+    elif state.get("thinking"):
+        with st.expander("模型思考过程（Think）", expanded=False):
+            st.markdown(state["thinking"])
+    rt = state.get("react_trace") or []
+    if rt:
+        with st.expander("ReAct 反思链路（Reflect）", expanded=False):
+            for step in rt:
+                rnd = step.get("round", "?")
+                need = step.get("need_replan")
+                code = step.get("reflection_code", "-")
+                st.markdown(
+                    f"**轮次 {rnd}**  ·  `need_replan={need}`  ·  `{code}`"
+                )
+                if step.get("react_reasoning"):
+                    st.markdown(step["react_reasoning"])
+                else:
+                    st.caption("（未启用 LLM 反思或未返回文案；仅机械判定）")
+    if state.get("nlu_timing_ms"):
+        st.caption("**NLU 耗时 (ms):** " + ", ".join(f"{k}={v}" for k, v in state["nlu_timing_ms"].items()))
     if state.get("slots"):
         st.caption("**Slots:** " + ", ".join(f"{k}={v}" for k, v in state["slots"].items()))
     if state.get("memory_long"):

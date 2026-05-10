@@ -1,6 +1,8 @@
-import sys
-from pathlib import Path
+"""Force deterministic offline pipeline before importing ``src`` (pytest loads this first)."""
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from __future__ import annotations
+
+import os
+
+# Override repo .env so tests never hit remote LLM APIs.
+os.environ["LLM_PROVIDER"] = "fake"

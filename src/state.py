@@ -74,6 +74,7 @@ class AgentState(TypedDict, total=False):
     intent: str
     intent_conf: float
     slots: dict[str, Any]
+    nlu_timing_ms: dict[str, float]  # rules vs llm.invoke 拆分（便于排查延迟）
 
     # Retrieval
     retrieved: list[RetrievedDoc]
@@ -94,6 +95,10 @@ class AgentState(TypedDict, total=False):
     reflection: Optional[str]
     need_replan: bool
     replan_count: int
+    react_trace: list[dict[str, Any]]  # ReAct：每轮 reflect 追加一步（含可选 LLM 反思）
+
+    # LLM reasoning (observe → plan)
+    thinking: str
 
     # Memory
     memory_short: dict[str, Any]
@@ -102,6 +107,9 @@ class AgentState(TypedDict, total=False):
 
     # Trace
     trace: list[TraceEvent]
+
+    # LLM raw exchanges (for UI / operators; each node appends)
+    llm_run_summary: list[dict[str, Any]]
 
 
 # Default factory ----------------------------------------------------------
@@ -136,8 +144,11 @@ def initial_state(user_input: str, *, user_id: str = "anon", mode: str = "determ
         reflection=None,
         need_replan=False,
         replan_count=0,
+        react_trace=[],
+        thinking="",
         memory_short={},
         memory_working={},
         memory_long={},
         trace=[],
+        llm_run_summary=[],
     )

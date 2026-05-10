@@ -16,6 +16,7 @@ from src.nodes import (
     plan_node,
     reflect_node,
     retrieve_node,
+    think_node,
 )
 from src.state import AgentState
 
@@ -27,6 +28,7 @@ def build_react_graph(*, with_checkpointer: bool = True):
     g.add_node("nlu", nlu_node)
     g.add_node("retrieve", retrieve_node)
     g.add_node("observe", observe_node)
+    g.add_node("think", think_node)
     g.add_node("plan", plan_node)
     g.add_node("act", act_node)
     g.add_node("confirm", confirm_node)
@@ -44,12 +46,13 @@ def build_react_graph(*, with_checkpointer: bool = True):
         after_nlu,
         {
             "retrieve": "retrieve",
-            "plan": "plan",
+            "plan": "think",
             "shortcut": "memory_update",
         },
     )
     g.add_edge("retrieve", "observe")
-    g.add_edge("observe", "plan")
+    g.add_edge("observe", "think")
+    g.add_edge("think", "plan")
     g.add_edge("plan", "act")
     g.add_conditional_edges(
         "act",
@@ -57,10 +60,11 @@ def build_react_graph(*, with_checkpointer: bool = True):
         {"confirm": "confirm", "reflect": "reflect"},
     )
     g.add_edge("confirm", "memory_update")
+    # replan 回到 think → plan，让用户可见第二轮「思考 → 计划 → 行动」链路
     g.add_conditional_edges(
         "reflect",
         after_reflect,
-        {"replan": "plan", "finish": "memory_update"},
+        {"replan": "think", "finish": "memory_update"},
     )
     g.add_edge("memory_update", END)
 

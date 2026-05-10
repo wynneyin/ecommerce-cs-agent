@@ -23,6 +23,7 @@ from src.nodes import (
     plan_node,
     reflect_node,
     retrieve_node,
+    think_node,
 )
 from src.state import AgentState
 
@@ -34,6 +35,7 @@ def build_deterministic_graph(*, with_checkpointer: bool = True):
     g.add_node("nlu", nlu_node)
     g.add_node("retrieve", retrieve_node)
     g.add_node("observe", observe_node)
+    g.add_node("think", think_node)
     g.add_node("plan", plan_node)
     g.add_node("act", act_node)
     g.add_node("confirm", confirm_node)
@@ -51,12 +53,13 @@ def build_deterministic_graph(*, with_checkpointer: bool = True):
         after_nlu,
         {
             "retrieve": "retrieve",
-            "plan": "plan",
+            "plan": "think",
             "shortcut": "memory_update",
         },
     )
     g.add_edge("retrieve", "observe")
-    g.add_edge("observe", "plan")
+    g.add_edge("observe", "think")
+    g.add_edge("think", "plan")
     g.add_edge("plan", "act")
     g.add_conditional_edges(
         "act",

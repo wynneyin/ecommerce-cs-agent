@@ -3,12 +3,71 @@ composes the final, user-facing response."""
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
+from langchain_core.messages import HumanMessage
+
+from src.config import SETTINGS
+from src.llm import get_chat_model
+from src.llm.io_trace import merge_llm_summary
 from src.memory import LongTermMemory
 from src.state import AgentState
 from src.trace import traced_node
 
 
 _LONG_MEM = LongTermMemory()
+
+
+def _truncate_facts(obj: Any, n: int = 3200) -> str:
+    s = json.dumps(obj, ensure_ascii=False, default=str)
+    if len(s) > n:
+        return s[:n] + "…"
+    return s
+
+
+def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]]:
+    """Natural-language reply using tool outputs + optional thinking trace."""
+    if not SETTINGS.use_llm_synthesis():
+        return None, {}
+    actions = state.get("actions") or []
+    if not actions:
+        return None, {}
+
+    user_input = state.get("user_input") or ""
+    intent = state.get("intent") or "unknown"
+    thinking = (state.get("thinking") or "").strip()
+    last = actions[-1] if actions else None
+    last_out = last.get("output") if isinstance(last, dict) else None
+    facts = _truncate_facts(last_out) if last_out is not None else "(本轮无工具 JSON 输出)"
+
+    prompt = (
+        "你是专业电商客服助手。请根据下方「事实」用简洁、礼貌的中文直接回复用户；"
+        "不要编造订单号、金额或物流信息；事实里没有的信息不要说「已确认」。\n\n"
+        f"用户问题：{user_input}\n"
+        f"系统意图：{intent}\n"
+    )
+    if thinking:
+        prompt += f"内部推理（可融入语气，勿逐字复述）：{thinking}\n"
+    prompt += f"工具返回的事实：{facts}\n\n请输出一段话给用户（不要 JSON、不要标题）："
+    try:
+        llm = get_chat_model()
+        msg = llm.invoke([HumanMessage(content=prompt)])
+        out = (getattr(msg, "content", "") or "").strip()
+        if not out:
+            return None, {}
+        patch = merge_llm_summary(
+            state, "reply_synthesis", out, prompt_hint=prompt[:1200]
+        )
+        return out, patch
+    except Exception as exc:
+        patch = merge_llm_summary(
+            state,
+            "reply_synthesis_error",
+            repr(exc),
+            prompt_hint=prompt[:800],
+        )
+        return None, patch
 
 
 def _from_action_output(intent: str, out: dict) -> str | None:
@@ -124,9 +183,13 @@ def _fallback_response(state: AgentState) -> str:
     return "暂未理解您的问题,可以尝试更具体地描述,例如「订单 E202603000001 物流到哪了?」"
 
 
-def _final_response_from_state(state: AgentState) -> str:
+def _compose_final_response(
+    state: AgentState, *, synthesized: str | None = None
+) -> str:
     if state.get("final_response"):
         return state["final_response"]
+    if synthesized:
+        return synthesized
 
     intent = state.get("intent") or "unknown"
     actions = state.get("actions") or []
@@ -162,7 +225,11 @@ def memory_update_node(state: AgentState) -> dict:
 
     _LONG_MEM.put(user_id, long_mem)
 
-    return {
+    syn, syn_patch = _llm_synthesize_final(state)
+    fr = _compose_final_response(state, synthesized=syn)
+    out: dict[str, Any] = {
         "memory_long": long_mem,
-        "final_response": _final_response_from_state(state),
+        "final_response": fr,
     }
+    out.update(syn_patch)
+    return out

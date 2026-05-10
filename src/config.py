@@ -74,5 +74,29 @@ class Settings:
     def is_fake_embedding(self) -> bool:
         return self.embedding_provider.lower() == "fake"
 
+    def use_llm_nlu(self) -> bool:
+        """Use remote NLU when not on fake provider (overridable via USE_LLM_NLU)."""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_NLU", True)
+
+    def use_llm_thinking(self) -> bool:
+        """Reasoning step between observe and plan (USE_LLM_THINKING)."""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_THINKING", True)
+
+    def use_llm_synthesis(self) -> bool:
+        """Compose final reply with the chat model (USE_LLM_SYNTHESIS)."""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_SYNTHESIS", True)
+
+    def use_llm_react_reflect(self) -> bool:
+        """After act, generate readable ReAct-style reflection text (USE_LLM_REACT_REFLECT)."""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_REACT_REFLECT", True)
+
 
 SETTINGS = Settings()
