@@ -98,5 +98,17 @@ class Settings:
             return False
         return _bool("USE_LLM_REACT_REFLECT", True)
 
+    def use_llm_conversational_fallback(self) -> bool:
+        """When no tool JSON reply, paraphrase template draft into natural CS tone (USE_LLM_CONVERSATIONAL)."""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_CONVERSATIONAL", True)
+
+    def use_llm_query_understanding(self) -> bool:
+        """Guardrails → NLU 之前：用大模型拆解用户问题（USE_LLM_UNDERSTAND）。"""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_UNDERSTAND", True)
+
 
 SETTINGS = Settings()

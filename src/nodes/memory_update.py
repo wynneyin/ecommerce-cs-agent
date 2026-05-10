@@ -11,6 +11,10 @@ from langchain_core.messages import HumanMessage
 from src.config import SETTINGS
 from src.llm import get_chat_model
 from src.llm.io_trace import merge_llm_summary
+from src.llm.persona_prompts import (
+    build_conversational_fallback_prompt,
+    build_synthesis_prompt,
+)
 from src.memory import LongTermMemory
 from src.state import AgentState
 from src.trace import traced_node
@@ -27,7 +31,7 @@ def _truncate_facts(obj: Any, n: int = 3200) -> str:
 
 
 def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]]:
-    """Natural-language reply using tool outputs + optional thinking trace."""
+    """Natural-language reply using tool outputs + persona/safety prompts."""
     if not SETTINGS.use_llm_synthesis():
         return None, {}
     actions = state.get("actions") or []
@@ -41,15 +45,12 @@ def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]
     last_out = last.get("output") if isinstance(last, dict) else None
     facts = _truncate_facts(last_out) if last_out is not None else "(本轮无工具 JSON 输出)"
 
-    prompt = (
-        "你是专业电商客服助手。请根据下方「事实」用简洁、礼貌的中文直接回复用户；"
-        "不要编造订单号、金额或物流信息；事实里没有的信息不要说「已确认」。\n\n"
-        f"用户问题：{user_input}\n"
-        f"系统意图：{intent}\n"
+    prompt = build_synthesis_prompt(
+        user_input=user_input,
+        intent=intent,
+        facts=facts,
+        thinking=thinking,
     )
-    if thinking:
-        prompt += f"内部推理（可融入语气，勿逐字复述）：{thinking}\n"
-    prompt += f"工具返回的事实：{facts}\n\n请输出一段话给用户（不要 JSON、不要标题）："
     try:
         llm = get_chat_model()
         msg = llm.invoke([HumanMessage(content=prompt)])
@@ -70,12 +71,65 @@ def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]
         return None, patch
 
 
+def _llm_conversational_reply(
+    state: AgentState, *, template_hint: str
+) -> tuple[str | None, dict[str, Any]]:
+    """Turn rigid template lines into warmer prose; keeps draft as factual anchor."""
+    if not SETTINGS.use_llm_conversational_fallback():
+        return None, {}
+    intent = state.get("intent") or "unknown"
+    if intent == "unsafe":
+        return None, {}
+
+    slots = state.get("slots") or {}
+    slots_hint = json.dumps(slots, ensure_ascii=False) if slots else "(空)"
+    mem = state.get("memory_long") or {}
+    memory_hint = json.dumps(mem, ensure_ascii=False)[:800] if mem else ""
+
+    extra = ""
+    if template_hint.strip():
+        extra = (
+            "【以下为系统根据规则生成的要点草稿，请改写得更自然、像真人客服；"
+            "不得编造草稿里没有的事实】\n"
+            + template_hint.strip()[:2000]
+        )
+
+    prompt = build_conversational_fallback_prompt(
+        user_input=state.get("user_input") or "",
+        intent=intent,
+        slots_hint=slots_hint,
+        memory_hint=memory_hint,
+        extra_context=extra,
+    )
+    try:
+        llm = get_chat_model()
+        msg = llm.invoke([HumanMessage(content=prompt)])
+        out = (getattr(msg, "content", "") or "").strip()
+        if not out:
+            return None, {}
+        patch = merge_llm_summary(
+            state,
+            "reply_conversational",
+            out,
+            prompt_hint=prompt[:1200],
+        )
+        return out, patch
+    except Exception as exc:
+        patch = merge_llm_summary(
+            state,
+            "reply_conversational_error",
+            repr(exc),
+            prompt_hint=prompt[:600],
+        )
+        return None, patch
+
+
 def _from_action_output(intent: str, out: dict) -> str | None:
     """Render a final response from the last successful tool output."""
     if intent == "product_search":
         items = out.get("items") or []
         if not items:
-            return "没有找到匹配的商品,可以换个关键词或放宽预算试试~"
+            return "这边筛了一圈暂时没有命中商品，要不您换个关键词或说说预算区间，我再帮您找找？"
         return "为您找到以下商品:\n" + "\n".join(
             f"- {it['name']}({it['product_id']}, {it['price']} 元, {it['rating']} 分)"
             for it in items[:5]
@@ -115,8 +169,6 @@ def _from_action_output(intent: str, out: dict) -> str | None:
             return "暂未找到相关政策,请补充更多细节。"
         first = items[0]
         topic = first.get("metadata", {}).get("title") or first.get("id")
-        # Resolve the *original* FAQ body via topic id (the indexed text contains
-        # keyword soup, which is bad for direct presentation).
         from src.tools.data_loader import load_faq
 
         raw_body = ""
@@ -142,18 +194,18 @@ def _fallback_response(state: AgentState) -> str:
     slots = state.get("slots") or {}
 
     if intent == "refund_request" and not slots.get("order_id"):
-        return "请提供您要退款的订单号(例如 E202603000001),并简单说明原因。"
+        return "要帮您处理退款的话，需要订单号哦～发一下类似 E202603000001 这种号，并简单说下原因，这边帮您跟进。"
     if intent == "refund_request":
-        return "退款流程暂未走通,请检查订单号是否正确,或换种描述。"
+        return "退款这边暂时没查到可用记录，麻烦您核对订单号是否复制完整，或换个说法我再试试。"
     if intent == "order_query" and not slots.get("order_id"):
-        return "请提供您要查询的订单号(例如 E202603000001)。"
+        return "查订单需要订单号～您发我一行类似 E202603000001 的号码就可以。"
     if intent == "order_query":
-        return "未能查到该订单,请检查订单号是否正确。"
+        return "这个订单号目前没查到结果，您方便确认一下是否输错，或换订单再试？"
 
     if intent == "memory_recall":
         mem = state.get("memory_long") or {}
         if not mem:
-            return "暂无相关记忆,可以告诉我您想做什么吗?"
+            return "我这边还没记下您刚才聊的细节，可以直接再说一下您想找什么吗？"
         parts: list[str] = []
         if mem.get("last_category"):
             parts.append(f"类目「{mem['last_category']}」")
@@ -166,30 +218,32 @@ def _fallback_response(state: AgentState) -> str:
         if mem.get("last_order_id"):
             parts.append(f"订单 {mem['last_order_id']}")
         if parts:
-            return "我记得您之前关注的是 " + "、".join(parts) + "。需要继续上次的话题吗?"
+            return "我记得您刚才关注的是 " + "、".join(parts) + "。咱们继续从这个往下聊可以吗？"
         recall = mem.get("last_intent")
         if recall:
-            return f"我记得您上一次咨询的是:{recall}。需要继续吗?"
-        return "暂无相关记忆,可以告诉我您想做什么吗?"
+            return f"您上一条像是在问「{recall}」相关的事，还要接着聊这块吗？"
+        return "我这边暂时没对上之前的上下文，您再用一句话说说需求就行～"
 
     if intent == "smalltalk":
-        return "您好,我是客服助手,请问有什么可以帮您?"
+        return "嗨～我是店铺客服，购物、订单、售后都可以问我，您想先从哪块开始？"
     if intent == "unsafe":
-        return "抱歉,该话题不在客服支持范围内。"
+        return "抱歉，这类内容不在咱们客服受理范围内；若有购物相关问题可以随时问我。"
 
     if state.get("guardrails_reason"):
-        return "抱歉,我无法处理该请求。"
+        return "抱歉，这条我这边没法处理；换成订单、商品或售后相关的问题我可以帮您看。"
 
-    return "暂未理解您的问题,可以尝试更具体地描述,例如「订单 E202603000001 物流到哪了?」"
+    return (
+        "这句我还没完全对上您的具体需求～可以说说订单号、商品类型或者遇到的现象，我帮您一步步看。"
+    )
 
 
-def _compose_final_response(
+def _compose_final_response_bundle(
     state: AgentState, *, synthesized: str | None = None
-) -> str:
+) -> tuple[str, dict[str, Any]]:
     if state.get("final_response"):
-        return state["final_response"]
+        return state["final_response"], {}
     if synthesized:
-        return synthesized
+        return synthesized, {}
 
     intent = state.get("intent") or "unknown"
     actions = state.get("actions") or []
@@ -198,9 +252,19 @@ def _compose_final_response(
     if last and last.get("ok") and isinstance(last.get("output"), dict):
         rendered = _from_action_output(intent, last["output"])
         if rendered:
-            return rendered
+            if SETTINGS.use_llm_conversational_fallback() and not SETTINGS.is_fake_llm():
+                conv, patch = _llm_conversational_reply(
+                    state, template_hint=rendered
+                )
+                if conv:
+                    return conv, patch
+            return rendered, {}
 
-    return _fallback_response(state)
+    draft = _fallback_response(state)
+    conv, patch = _llm_conversational_reply(state, template_hint=draft)
+    if conv:
+        return conv, patch
+    return draft, {}
 
 
 @traced_node("memory_update")
@@ -226,10 +290,11 @@ def memory_update_node(state: AgentState) -> dict:
     _LONG_MEM.put(user_id, long_mem)
 
     syn, syn_patch = _llm_synthesize_final(state)
-    fr = _compose_final_response(state, synthesized=syn)
+    fr, extra_patch = _compose_final_response_bundle(state, synthesized=syn)
     out: dict[str, Any] = {
         "memory_long": long_mem,
         "final_response": fr,
     }
     out.update(syn_patch)
+    out.update(extra_patch)
     return out

@@ -8,9 +8,11 @@ from src.nodes.plan import plan_node
 from src.nodes.reflect import reflect_node
 from src.nodes.retrieve import retrieve_node
 from src.nodes.think import think_node
+from src.nodes.understand import understand_node
 
 __all__ = [
     "guardrails_node",
+    "understand_node",
     "nlu_node",
     "retrieve_node",
     "observe_node",

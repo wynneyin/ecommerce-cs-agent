@@ -58,8 +58,8 @@ def _llm_primary_nlu(state: AgentState, text: str) -> tuple[dict[str, Any] | Non
         "intent 必须是下列之一:\n"
         "product_search, product_detail, product_compare, order_query, refund_request, "
         "faq_policy, memory_recall, smalltalk, unknown\n"
-        "slots 可含: order_id, product_id, product_ids, category, budget, quantity, "
-        "refund_reason, query 等; 无则 slots 为 {}。\n"
+        "slots 尽量从原文抽取可用字段，不必填满；拿不准的不要编造，可省略键或使用空对象 {}。\n"
+        "常见键示例: order_id, product_id, product_ids, category, budget, quantity, refund_reason, query。\n"
         f"用户原话: {text}"
     )
     llm = get_chat_model()

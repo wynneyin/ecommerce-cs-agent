@@ -44,10 +44,16 @@ def think_node(state: AgentState) -> dict:
             "请在本轮思考中明确：为何要调整策略、下一步计划侧重点。\n"
         )
 
+    prior_u = (state.get("query_understanding") or "").strip()
+    upstream = ""
+    if prior_u:
+        upstream = f"【上游：对用户话的拆解（请先对齐，再补充执行侧推理）】\n{prior_u}\n\n"
+
     prompt = (
         "你是电商客服系统的内部推理模块（Think，发生在 Plan 之前）。根据下方上下文，用简洁中文写出你的思考过程"
         "（3～8 句）：①用户想要什么；②已有槽位与检索线索；③下一步应执行的客服策略。\n"
         "不要输出 JSON 或代码块，不要使用 Markdown 标题符号。\n\n"
+        f"{upstream}"
         f"用户原话：{user}\n"
         f"NLU 意图：{intent}\n"
         f"槽位：{slots}\n"

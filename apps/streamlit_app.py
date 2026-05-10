@@ -175,8 +175,81 @@ def _render_action_card(action: dict | None) -> None:
     st.json(out)
 
 
+def _render_react_flow_panel(state: dict) -> None:
+    """置顶展示：拆解 → NLU → Think → Plan/Act → Reflect（ReAct 可见脉络）。"""
+    mode = state.get("mode") or "-"
+    with st.container(border=True):
+        st.markdown("### ReAct / 模型推理脉络")
+        st.caption(
+            f"当前 **mode=`{mode}`** · 典型链路：**Understand（拆解）→ NLU → Retrieve? → Think → Plan → Act → Reflect → 回复**。"
+            "shortcut 分支会跳过检索/Think。"
+        )
+
+        qu = (state.get("query_understanding") or "").strip()
+        st.markdown("##### ① Understand · 用户问题拆解（大模型）")
+        if qu:
+            st.markdown(qu)
+        else:
+            st.caption("（无 — 未启用远程拆解或非 LLM 模式）")
+
+        intent = state.get("intent", "-")
+        ic = float(state.get("intent_conf") or 0)
+        st.markdown("##### ② NLU · 意图与槽位")
+        st.markdown(f"- **intent**：`{intent}`　·　**confidence**：{ic:.2f}")
+        slots = state.get("slots") or {}
+        if slots:
+            st.markdown("- **slots**： " + " · ".join(f"`{k}`={v}" for k, v in slots.items()))
+        else:
+            st.caption("slots：（空）")
+
+        think_rounds = (state.get("memory_working") or {}).get("think_rounds")
+        st.markdown("##### ③ Think · 执行计划前的推理")
+        if think_rounds:
+            for i, t in enumerate(think_rounds, start=1):
+                st.markdown(f"**第 {i} 轮**\n\n{t}")
+        elif state.get("thinking"):
+            st.markdown(state["thinking"])
+        else:
+            st.caption("（本轮未生成 Think — 可能 shortcut 或未启用）")
+
+        plan = state.get("plan") or []
+        st.markdown("##### ④ Plan → Act")
+        if plan:
+            st.json({"plan": plan})
+        else:
+            st.caption("plan：（空）")
+        acts = state.get("actions") or []
+        if acts:
+            st.caption("工具执行摘要（最近几条）：")
+            for a in acts[-5:]:
+                st.markdown(
+                    f"- `{a.get('name')}` · ok={a.get('ok')} · {a.get('latency_ms', 0)} ms"
+                )
+        else:
+            st.caption("actions：（无）")
+
+        rt = state.get("react_trace") or []
+        st.markdown("##### ⑤ Reflect · 执行后反思（ReAct 闭环）")
+        if rt:
+            for step in rt:
+                rnd = step.get("round", "?")
+                need = step.get("need_replan")
+                code = step.get("reflection_code", "-")
+                st.markdown(
+                    f"**轮次 {rnd}** · `need_replan={need}` · `{code}`"
+                )
+                if step.get("react_reasoning"):
+                    st.markdown(step["react_reasoning"])
+                else:
+                    st.caption("（仅机械码，未生成反思长文）")
+        else:
+            st.caption("（本轮无 Reflect — shortcut / 确认分支 / deterministic 单次）")
+
+
 def _stage_display_name(stage: str) -> str:
     names = {
+        "query_understanding": "Understand · 用户问题拆解（自然语言）",
+        "query_understanding_error": "Understand 调用异常",
         "nlu_primary": "NLU 意图识别（约定输出 JSON）",
         "nlu_refine": "NLU 兜底纠错（JSON）",
         "nlu_refine_error": "NLU 调用异常",
@@ -186,6 +259,8 @@ def _stage_display_name(stage: str) -> str:
         "reflect_error": "Reflect 调用异常",
         "reply_synthesis": "最终话术合成（自然语言）",
         "reply_synthesis_error": "话术合成异常",
+        "reply_conversational": "会话润色 / 无工具兜底（自然语言）",
+        "reply_conversational_error": "会话润色异常",
     }
     return names.get(stage, stage)
 
@@ -194,6 +269,20 @@ def _render_llm_response_body(stage: str, resp: str) -> None:
     """NLU steps return JSON by design; others are prose."""
     if not resp.strip():
         st.caption("_(空)_")
+        return
+    if stage.startswith("query_understanding"):
+        st.caption("此为 **Understand** 步骤：内部拆解用户话，不是最终客服口吻。")
+        if stage.endswith("_error"):
+            st.warning(resp)
+        else:
+            st.markdown(resp)
+        return
+    if stage in ("reply_conversational", "reply_conversational_error"):
+        st.caption("此为 **无工具或模板润色** 的自然语言回复。")
+        if stage.endswith("_error"):
+            st.warning(resp)
+        else:
+            st.markdown(resp)
         return
     if stage.startswith("nlu"):
         st.caption(
@@ -228,6 +317,8 @@ def _render_trace(events: list[dict]) -> None:
 
 
 def _render_state_summary(state: dict) -> None:
+    _render_react_flow_panel(state)
+
     summary_list = state.get("llm_run_summary") or []
     if summary_list:
         with st.expander("🔍 本轮 LLM 调用摘录（原始输出，便于排查）", expanded=True):
@@ -254,32 +345,8 @@ def _render_state_summary(state: dict) -> None:
     cols[1].metric("Conf", f"{state.get('intent_conf', 0):.2f}")
     cols[2].metric("Retrieval", state.get("retrieval_method") or "-")
     cols[3].metric("Mode", state.get("mode") or "-")
-    think_rounds = (state.get("memory_working") or {}).get("think_rounds")
-    if think_rounds:
-        with st.expander("Think 推理（多轮 plan 前）", expanded=False):
-            for i, t in enumerate(think_rounds, start=1):
-                st.markdown(f"**第 {i} 轮**\n\n{t}")
-    elif state.get("thinking"):
-        with st.expander("模型思考过程（Think）", expanded=False):
-            st.markdown(state["thinking"])
-    rt = state.get("react_trace") or []
-    if rt:
-        with st.expander("ReAct 反思链路（Reflect）", expanded=False):
-            for step in rt:
-                rnd = step.get("round", "?")
-                need = step.get("need_replan")
-                code = step.get("reflection_code", "-")
-                st.markdown(
-                    f"**轮次 {rnd}**  ·  `need_replan={need}`  ·  `{code}`"
-                )
-                if step.get("react_reasoning"):
-                    st.markdown(step["react_reasoning"])
-                else:
-                    st.caption("（未启用 LLM 反思或未返回文案；仅机械判定）")
     if state.get("nlu_timing_ms"):
         st.caption("**NLU 耗时 (ms):** " + ", ".join(f"{k}={v}" for k, v in state["nlu_timing_ms"].items()))
-    if state.get("slots"):
-        st.caption("**Slots:** " + ", ".join(f"{k}={v}" for k, v in state["slots"].items()))
     if state.get("memory_long"):
         st.caption("**Memory:** " + ", ".join(f"{k}={v}" for k, v in state["memory_long"].items()))
 

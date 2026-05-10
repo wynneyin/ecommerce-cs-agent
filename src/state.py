@@ -70,6 +70,9 @@ class AgentState(TypedDict, total=False):
     guardrails_pass: bool
     guardrails_reason: Optional[str]
 
+    # Understand（大模型拆解用户话，早于 NLU）
+    query_understanding: str
+
     # NLU
     intent: str
     intent_conf: float
@@ -129,6 +132,7 @@ def initial_state(user_input: str, *, user_id: str = "anon", mode: str = "determ
         mode=mode,  # type: ignore[arg-type]
         guardrails_pass=True,
         guardrails_reason=None,
+        query_understanding="",
         intent="unknown",
         intent_conf=0.0,
         slots={},

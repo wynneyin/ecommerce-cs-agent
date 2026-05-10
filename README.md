@@ -70,7 +70,7 @@ uvicorn apps.api_server:app --reload --port 8000
 
 复制 `.env.example` 为 `.env`。默认 `LLM_PROVIDER=fake` 无需密钥。切换真实模型时设置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`，并将 `LLM_PROVIDER` 设为 `openai`（兼容 OpenAI API 的网关均可）。
 
-接入真实大模型后的默认链路（仅在非 `fake` 时生效）：`USE_LLM_NLU`（意图 JSON）、`USE_LLM_THINKING`（observe→plan 间 Think 文案）、`USE_LLM_SYNTHESIS`（按工具事实合成最终回复）、`USE_LLM_REACT_REFLECT`（act 之后 Reflect 的自然语言反思，写入 `react_trace`）。默认均为 `true`。ReAct 模式下若触发重规划，路由为 **reflect → think → plan → act**（第二轮仍会 Think）。
+接入真实大模型后的默认链路（仅在非 `fake` 时生效）：`USE_LLM_UNDERSTAND`（**最先**：用大模型拆解用户输入，写入 `query_understanding`，Think 会引用）、`USE_LLM_NLU`、`USE_LLM_THINKING`、`USE_LLM_SYNTHESIS`、`USE_LLM_CONVERSATIONAL`、`USE_LLM_REACT_REFLECT`。编排：**guardrails → understand → nlu → …**。ReAct 重规划：**reflect → think → plan → act**。Streamlit 助手气泡下 **「ReAct / 模型推理脉络」** 汇总拆解与 Think/Reflect。
 
 排查 LLM 是否返回内容：前端助手气泡下展开 **「本轮 LLM 调用摘录」**；或在服务端设 `AGENT_LOG_LLM=1`（默认）看 stderr 里每次调用的 prompt 摘要与原始回复。
 

@@ -24,6 +24,7 @@ from src.nodes import (
     reflect_node,
     retrieve_node,
     think_node,
+    understand_node,
 )
 from src.state import AgentState
 
@@ -32,6 +33,7 @@ def build_deterministic_graph(*, with_checkpointer: bool = True):
     g = StateGraph(AgentState)
 
     g.add_node("guardrails", guardrails_node)
+    g.add_node("understand", understand_node)
     g.add_node("nlu", nlu_node)
     g.add_node("retrieve", retrieve_node)
     g.add_node("observe", observe_node)
@@ -46,8 +48,9 @@ def build_deterministic_graph(*, with_checkpointer: bool = True):
     g.add_conditional_edges(
         "guardrails",
         after_guardrails,
-        {"continue": "nlu", "block": "memory_update"},
+        {"continue": "understand", "block": "memory_update"},
     )
+    g.add_edge("understand", "nlu")
     g.add_conditional_edges(
         "nlu",
         after_nlu,
