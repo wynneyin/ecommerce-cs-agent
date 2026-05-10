@@ -1,0 +1,883 @@
+[
+  {
+    "product_id": "P1001",
+    "name": "星河 Pro 14",
+    "category": "手机",
+    "price": 5499,
+    "stock": 14,
+    "rating": 4.22,
+    "specs": [
+      "6.7寸",
+      "5000mAh",
+      "1TB"
+    ],
+    "tags": [
+      "旗舰",
+      "拍照"
+    ],
+    "description": "星河 Pro 14 是一款主打旗舰的手机,核心卖点:6.7寸, 5000mAh, 1TB。"
+  },
+  {
+    "product_id": "P1002",
+    "name": "星河 Lite",
+    "category": "手机",
+    "price": 1999,
+    "stock": 35,
+    "rating": 4.38,
+    "specs": [
+      "6.5寸",
+      "4500mAh",
+      "128GB"
+    ],
+    "tags": [
+      "性价比",
+      "学生"
+    ],
+    "description": "星河 Lite 是一款主打性价比的手机,核心卖点:6.5寸, 4500mAh, 128GB。"
+  },
+  {
+    "product_id": "P1003",
+    "name": "银河 Ultra",
+    "category": "手机",
+    "price": 7999,
+    "stock": 17,
+    "rating": 4.75,
+    "specs": [
+      "2K曲面",
+      "潜望长焦",
+      "1TB"
+    ],
+    "tags": [
+      "旗舰",
+      "商务"
+    ],
+    "description": "银河 Ultra 是一款主打旗舰的手机,核心卖点:2K曲面, 潜望长焦, 1TB。"
+  },
+  {
+    "product_id": "P1004",
+    "name": "初芒 X2",
+    "category": "手机",
+    "price": 1299,
+    "stock": 69,
+    "rating": 4.27,
+    "specs": [
+      "6.1寸",
+      "5000mAh",
+      "64GB"
+    ],
+    "tags": [
+      "入门",
+      "百元机"
+    ],
+    "description": "初芒 X2 是一款主打入门的手机,核心卖点:6.1寸, 5000mAh, 64GB。"
+  },
+  {
+    "product_id": "P1005",
+    "name": "初芒 Note",
+    "category": "手机",
+    "price": 1799,
+    "stock": 54,
+    "rating": 4.22,
+    "specs": [
+      "6.7寸",
+      "5500mAh",
+      "256GB"
+    ],
+    "tags": [
+      "大屏",
+      "续航"
+    ],
+    "description": "初芒 Note 是一款主打大屏的手机,核心卖点:6.7寸, 5500mAh, 256GB。"
+  },
+  {
+    "product_id": "P1006",
+    "name": "Phoenix S25",
+    "category": "手机",
+    "price": 4399,
+    "stock": 11,
+    "rating": 4.36,
+    "specs": [
+      "钛合金",
+      "AI助手",
+      "512GB"
+    ],
+    "tags": [
+      "旗舰",
+      "轻薄"
+    ],
+    "description": "Phoenix S25 是一款主打旗舰的手机,核心卖点:钛合金, AI助手, 512GB。"
+  },
+  {
+    "product_id": "P1007",
+    "name": "银翼 Air 14",
+    "category": "笔记本",
+    "price": 6499,
+    "stock": 64,
+    "rating": 4.65,
+    "specs": [
+      "i5-13",
+      "16G/512G",
+      "2.8K"
+    ],
+    "tags": [
+      "办公",
+      "学生"
+    ],
+    "description": "银翼 Air 14 是一款主打办公的笔记本,核心卖点:i5-13, 16G/512G, 2.8K。"
+  },
+  {
+    "product_id": "P1008",
+    "name": "银翼 Pro 16",
+    "category": "笔记本",
+    "price": 11999,
+    "stock": 71,
+    "rating": 4.35,
+    "specs": [
+      "i9-13",
+      "32G/1T",
+      "RTX4060"
+    ],
+    "tags": [
+      "设计",
+      "游戏"
+    ],
+    "description": "银翼 Pro 16 是一款主打设计的笔记本,核心卖点:i9-13, 32G/1T, RTX4060。"
+  },
+  {
+    "product_id": "P1009",
+    "name": "墨竹 X14 Plus",
+    "category": "笔记本",
+    "price": 5499,
+    "stock": 69,
+    "rating": 4.51,
+    "specs": [
+      "R7-7840",
+      "16G/1T",
+      "OLED"
+    ],
+    "tags": [
+      "性价比",
+      "设计"
+    ],
+    "description": "墨竹 X14 Plus 是一款主打性价比的笔记本,核心卖点:R7-7840, 16G/1T, OLED。"
+  },
+  {
+    "product_id": "P1010",
+    "name": "墨竹 Y9000K",
+    "category": "笔记本",
+    "price": 14999,
+    "stock": 57,
+    "rating": 4.64,
+    "specs": [
+      "i9HX",
+      "32G/2T",
+      "RTX4080"
+    ],
+    "tags": [
+      "旗舰",
+      "游戏"
+    ],
+    "description": "墨竹 Y9000K 是一款主打旗舰的笔记本,核心卖点:i9HX, 32G/2T, RTX4080。"
+  },
+  {
+    "product_id": "P1011",
+    "name": "MaiBook Air 13",
+    "category": "笔记本",
+    "price": 8999,
+    "stock": 0,
+    "rating": 4.77,
+    "specs": [
+      "M3",
+      "16G/512G",
+      "13寸"
+    ],
+    "tags": [
+      "轻薄",
+      "办公"
+    ],
+    "description": "MaiBook Air 13 是一款主打轻薄的笔记本,核心卖点:M3, 16G/512G, 13寸。"
+  },
+  {
+    "product_id": "P1012",
+    "name": "MaiBook Pro 14",
+    "category": "笔记本",
+    "price": 14999,
+    "stock": 20,
+    "rating": 4.72,
+    "specs": [
+      "M3 Pro",
+      "18G/1T",
+      "ProMotion"
+    ],
+    "tags": [
+      "旗舰",
+      "创作"
+    ],
+    "description": "MaiBook Pro 14 是一款主打旗舰的笔记本,核心卖点:M3 Pro, 18G/1T, ProMotion。"
+  },
+  {
+    "product_id": "P1013",
+    "name": "声波 Pods 3",
+    "category": "耳机",
+    "price": 1299,
+    "stock": 43,
+    "rating": 4.41,
+    "specs": [
+      "主动降噪",
+      "30h",
+      "蓝牙5.3"
+    ],
+    "tags": [
+      "降噪",
+      "通勤"
+    ],
+    "description": "声波 Pods 3 是一款主打降噪的耳机,核心卖点:主动降噪, 30h, 蓝牙5.3。"
+  },
+  {
+    "product_id": "P1014",
+    "name": "声波 Pods Lite",
+    "category": "耳机",
+    "price": 399,
+    "stock": 27,
+    "rating": 4.92,
+    "specs": [
+      "半入耳",
+      "24h",
+      "通话降噪"
+    ],
+    "tags": [
+      "性价比",
+      "学生"
+    ],
+    "description": "声波 Pods Lite 是一款主打性价比的耳机,核心卖点:半入耳, 24h, 通话降噪。"
+  },
+  {
+    "product_id": "P1015",
+    "name": "Voyager Q35",
+    "category": "耳机",
+    "price": 2499,
+    "stock": 43,
+    "rating": 4.28,
+    "specs": [
+      "Hi-Res",
+      "40h",
+      "头戴"
+    ],
+    "tags": [
+      "发烧",
+      "高保真"
+    ],
+    "description": "Voyager Q35 是一款主打发烧的耳机,核心卖点:Hi-Res, 40h, 头戴。"
+  },
+  {
+    "product_id": "P1016",
+    "name": "Boom 100",
+    "category": "耳机",
+    "price": 199,
+    "stock": 48,
+    "rating": 4.27,
+    "specs": [
+      "运动入耳",
+      "8h",
+      "IPX5"
+    ],
+    "tags": [
+      "运动",
+      "百元"
+    ],
+    "description": "Boom 100 是一款主打运动的耳机,核心卖点:运动入耳, 8h, IPX5。"
+  },
+  {
+    "product_id": "P1017",
+    "name": "Echo Mini",
+    "category": "音箱",
+    "price": 299,
+    "stock": 44,
+    "rating": 4.65,
+    "specs": [
+      "蓝牙",
+      "10h",
+      "桌面"
+    ],
+    "tags": [
+      "桌面",
+      "便携"
+    ],
+    "description": "Echo Mini 是一款主打桌面的音箱,核心卖点:蓝牙, 10h, 桌面。"
+  },
+  {
+    "product_id": "P1018",
+    "name": "Echo Boom",
+    "category": "音箱",
+    "price": 999,
+    "stock": 5,
+    "rating": 4.75,
+    "specs": [
+      "立体声",
+      "防水",
+      "30W"
+    ],
+    "tags": [
+      "户外",
+      "派对"
+    ],
+    "description": "Echo Boom 是一款主打户外的音箱,核心卖点:立体声, 防水, 30W。"
+  },
+  {
+    "product_id": "P1019",
+    "name": "Hifi Star",
+    "category": "音箱",
+    "price": 4999,
+    "stock": 68,
+    "rating": 4.29,
+    "specs": [
+      "书架",
+      "85W",
+      "无线"
+    ],
+    "tags": [
+      "发烧",
+      "客厅"
+    ],
+    "description": "Hifi Star 是一款主打发烧的音箱,核心卖点:书架, 85W, 无线。"
+  },
+  {
+    "product_id": "P1020",
+    "name": "光影 A7C2",
+    "category": "相机",
+    "price": 13999,
+    "stock": 48,
+    "rating": 4.26,
+    "specs": [
+      "全画幅",
+      "33MP",
+      "4K60"
+    ],
+    "tags": [
+      "全画幅",
+      "视频"
+    ],
+    "description": "光影 A7C2 是一款主打全画幅的相机,核心卖点:全画幅, 33MP, 4K60。"
+  },
+  {
+    "product_id": "P1021",
+    "name": "光影 ZV1F",
+    "category": "相机",
+    "price": 4799,
+    "stock": 37,
+    "rating": 4.82,
+    "specs": [
+      "1英寸",
+      "Vlog",
+      "4K"
+    ],
+    "tags": [
+      "Vlog",
+      "便携"
+    ],
+    "description": "光影 ZV1F 是一款主打Vlog的相机,核心卖点:1英寸, Vlog, 4K。"
+  },
+  {
+    "product_id": "P1022",
+    "name": "快拍 X100Vi",
+    "category": "相机",
+    "price": 12999,
+    "stock": 79,
+    "rating": 4.86,
+    "specs": [
+      "复古",
+      "定焦",
+      "胶片模拟"
+    ],
+    "tags": [
+      "复古",
+      "街拍"
+    ],
+    "description": "快拍 X100Vi 是一款主打复古的相机,核心卖点:复古, 定焦, 胶片模拟。"
+  },
+  {
+    "product_id": "P1023",
+    "name": "漫游 Pad 11",
+    "category": "平板",
+    "price": 2299,
+    "stock": 46,
+    "rating": 4.63,
+    "specs": [
+      "120Hz",
+      "8200mAh",
+      "256G"
+    ],
+    "tags": [
+      "性价比",
+      "网课"
+    ],
+    "description": "漫游 Pad 11 是一款主打性价比的平板,核心卖点:120Hz, 8200mAh, 256G。"
+  },
+  {
+    "product_id": "P1024",
+    "name": "漫游 Pad Pro",
+    "category": "平板",
+    "price": 5499,
+    "stock": 8,
+    "rating": 4.23,
+    "specs": [
+      "MiniLED",
+      "M2同款",
+      "1T"
+    ],
+    "tags": [
+      "旗舰",
+      "生产力"
+    ],
+    "description": "漫游 Pad Pro 是一款主打旗舰的平板,核心卖点:MiniLED, M2同款, 1T。"
+  },
+  {
+    "product_id": "P1025",
+    "name": "MaiPad Air 11",
+    "category": "平板",
+    "price": 4799,
+    "stock": 29,
+    "rating": 4.78,
+    "specs": [
+      "M2",
+      "11寸",
+      "256G"
+    ],
+    "tags": [
+      "轻薄",
+      "学生"
+    ],
+    "description": "MaiPad Air 11 是一款主打轻薄的平板,核心卖点:M2, 11寸, 256G。"
+  },
+  {
+    "product_id": "P1026",
+    "name": "健行 Watch S3",
+    "category": "手表",
+    "price": 1499,
+    "stock": 10,
+    "rating": 4.84,
+    "specs": [
+      "GPS",
+      "心率",
+      "14天续航"
+    ],
+    "tags": [
+      "运动",
+      "健康"
+    ],
+    "description": "健行 Watch S3 是一款主打运动的手表,核心卖点:GPS, 心率, 14天续航。"
+  },
+  {
+    "product_id": "P1027",
+    "name": "健行 Watch GT",
+    "category": "手表",
+    "price": 999,
+    "stock": 12,
+    "rating": 4.49,
+    "specs": [
+      "血氧",
+      "10天",
+      "圆表"
+    ],
+    "tags": [
+      "性价比",
+      "健康"
+    ],
+    "description": "健行 Watch GT 是一款主打性价比的手表,核心卖点:血氧, 10天, 圆表。"
+  },
+  {
+    "product_id": "P1028",
+    "name": "MaiWatch S10",
+    "category": "手表",
+    "price": 2999,
+    "stock": 58,
+    "rating": 4.68,
+    "specs": [
+      "蜂窝版",
+      "ECG",
+      "钛壳"
+    ],
+    "tags": [
+      "旗舰",
+      "健康"
+    ],
+    "description": "MaiWatch S10 是一款主打旗舰的手表,核心卖点:蜂窝版, ECG, 钛壳。"
+  },
+  {
+    "product_id": "P1029",
+    "name": "飞行 Run 5",
+    "category": "鞋",
+    "price": 599,
+    "stock": 46,
+    "rating": 4.32,
+    "specs": [
+      "缓震",
+      "透气",
+      "马拉松"
+    ],
+    "tags": [
+      "跑步",
+      "缓震"
+    ],
+    "description": "飞行 Run 5 是一款主打跑步的鞋,核心卖点:缓震, 透气, 马拉松。"
+  },
+  {
+    "product_id": "P1030",
+    "name": "飞行 Trail 2",
+    "category": "鞋",
+    "price": 799,
+    "stock": 45,
+    "rating": 4.36,
+    "specs": [
+      "越野",
+      "防滑",
+      "防水"
+    ],
+    "tags": [
+      "越野",
+      "户外"
+    ],
+    "description": "飞行 Trail 2 是一款主打越野的鞋,核心卖点:越野, 防滑, 防水。"
+  },
+  {
+    "product_id": "P1031",
+    "name": "国潮 Old 1",
+    "category": "鞋",
+    "price": 399,
+    "stock": 34,
+    "rating": 4.73,
+    "specs": [
+      "复古",
+      "板鞋",
+      "百搭"
+    ],
+    "tags": [
+      "板鞋",
+      "百搭"
+    ],
+    "description": "国潮 Old 1 是一款主打板鞋的鞋,核心卖点:复古, 板鞋, 百搭。"
+  },
+  {
+    "product_id": "P1032",
+    "name": "肌研 玻尿酸面膜 5片",
+    "category": "面膜",
+    "price": 89,
+    "stock": 194,
+    "rating": 4.72,
+    "specs": [
+      "补水",
+      "敏感肌"
+    ],
+    "tags": [
+      "补水",
+      "敏感肌"
+    ],
+    "description": "肌研 玻尿酸面膜 5片,主打补水。"
+  },
+  {
+    "product_id": "P1033",
+    "name": "雪域 修护安瓶 30ml",
+    "category": "面膜",
+    "price": 199,
+    "stock": 175,
+    "rating": 4.72,
+    "specs": [
+      "修护",
+      "夜用"
+    ],
+    "tags": [
+      "修护",
+      "夜用"
+    ],
+    "description": "雪域 修护安瓶 30ml,主打修护。"
+  },
+  {
+    "product_id": "P1034",
+    "name": "童趣 卡通短袖",
+    "category": "服装",
+    "price": 79,
+    "stock": 156,
+    "rating": 4.76,
+    "specs": [
+      "儿童",
+      "纯棉"
+    ],
+    "tags": [
+      "儿童",
+      "纯棉"
+    ],
+    "description": "童趣 卡通短袖,主打儿童。"
+  },
+  {
+    "product_id": "P1035",
+    "name": "童趣 防晒外套",
+    "category": "服装",
+    "price": 159,
+    "stock": 61,
+    "rating": 4.63,
+    "specs": [
+      "UPF50+",
+      "夏季"
+    ],
+    "tags": [
+      "UPF50+",
+      "夏季"
+    ],
+    "description": "童趣 防晒外套,主打UPF50+。"
+  },
+  {
+    "product_id": "P1036",
+    "name": "云眠 记忆枕 单只",
+    "category": "家居",
+    "price": 129,
+    "stock": 89,
+    "rating": 4.89,
+    "specs": [
+      "睡眠",
+      "护颈"
+    ],
+    "tags": [
+      "睡眠",
+      "护颈"
+    ],
+    "description": "云眠 记忆枕 单只,主打睡眠。"
+  },
+  {
+    "product_id": "P1037",
+    "name": "清尘 无线吸尘器 Lite",
+    "category": "家居",
+    "price": 899,
+    "stock": 183,
+    "rating": 4.74,
+    "specs": [
+      "清洁",
+      "入门"
+    ],
+    "tags": [
+      "清洁",
+      "入门"
+    ],
+    "description": "清尘 无线吸尘器 Lite,主打清洁。"
+  },
+  {
+    "product_id": "P1038",
+    "name": "小厨 空气炸锅 4L",
+    "category": "家居",
+    "price": 399,
+    "stock": 76,
+    "rating": 4.74,
+    "specs": [
+      "厨房",
+      "少油"
+    ],
+    "tags": [
+      "厨房",
+      "少油"
+    ],
+    "description": "小厨 空气炸锅 4L,主打厨房。"
+  },
+  {
+    "product_id": "P1039",
+    "name": "劲跑 跳绳 计数款",
+    "category": "运动",
+    "price": 59,
+    "stock": 34,
+    "rating": 4.51,
+    "specs": [
+      "健身",
+      "有氧"
+    ],
+    "tags": [
+      "健身",
+      "有氧"
+    ],
+    "description": "劲跑 跳绳 计数款,主打健身。"
+  },
+  {
+    "product_id": "P1040",
+    "name": "山行 登山杖 碳纤维",
+    "category": "运动",
+    "price": 199,
+    "stock": 28,
+    "rating": 4.8,
+    "specs": [
+      "户外",
+      "徒步"
+    ],
+    "tags": [
+      "户外",
+      "徒步"
+    ],
+    "description": "山行 登山杖 碳纤维,主打户外。"
+  },
+  {
+    "product_id": "P1041",
+    "name": "每日坚果 混合装 500g",
+    "category": "食品",
+    "price": 79,
+    "stock": 122,
+    "rating": 4.53,
+    "specs": [
+      "零食",
+      "礼盒"
+    ],
+    "tags": [
+      "零食",
+      "礼盒"
+    ],
+    "description": "每日坚果 混合装 500g,主打零食。"
+  },
+  {
+    "product_id": "P1042",
+    "name": "有机燕麦片 1kg",
+    "category": "食品",
+    "price": 45,
+    "stock": 74,
+    "rating": 4.86,
+    "specs": [
+      "早餐",
+      "健康"
+    ],
+    "tags": [
+      "早餐",
+      "健康"
+    ],
+    "description": "有机燕麦片 1kg,主打早餐。"
+  },
+  {
+    "product_id": "P1043",
+    "name": "Python 入门到实践 第3版",
+    "category": "图书",
+    "price": 89,
+    "stock": 165,
+    "rating": 4.84,
+    "specs": [
+      "编程",
+      "教材"
+    ],
+    "tags": [
+      "编程",
+      "教材"
+    ],
+    "description": "Python 入门到实践 第3版,主打编程。"
+  },
+  {
+    "product_id": "P1044",
+    "name": "积木城市系列 街景",
+    "category": "玩具",
+    "price": 299,
+    "stock": 100,
+    "rating": 4.51,
+    "specs": [
+      "儿童",
+      "益智"
+    ],
+    "tags": [
+      "儿童",
+      "益智"
+    ],
+    "description": "积木城市系列 街景,主打儿童。"
+  },
+  {
+    "product_id": "P1045",
+    "name": "宠悦 冻干猫粮 2kg",
+    "category": "宠物",
+    "price": 159,
+    "stock": 147,
+    "rating": 4.6,
+    "specs": [
+      "猫粮",
+      "冻干"
+    ],
+    "tags": [
+      "猫粮",
+      "冻干"
+    ],
+    "description": "宠悦 冻干猫粮 2kg,主打猫粮。"
+  },
+  {
+    "product_id": "P1046",
+    "name": "丝绒雾面口红 豆沙色",
+    "category": "美妆",
+    "price": 129,
+    "stock": 184,
+    "rating": 4.63,
+    "specs": [
+      "口红",
+      "显白"
+    ],
+    "tags": [
+      "口红",
+      "显白"
+    ],
+    "description": "丝绒雾面口红 豆沙色,主打口红。"
+  },
+  {
+    "product_id": "P1047",
+    "name": "静音无线鼠标 M200",
+    "category": "办公",
+    "price": 79,
+    "stock": 87,
+    "rating": 4.47,
+    "specs": [
+      "办公",
+      "静音"
+    ],
+    "tags": [
+      "办公",
+      "静音"
+    ],
+    "description": "静音无线鼠标 M200,主打办公。"
+  },
+  {
+    "product_id": "P1048",
+    "name": "透明抽屉式收纳柜 5层",
+    "category": "收纳",
+    "price": 199,
+    "stock": 163,
+    "rating": 4.67,
+    "specs": [
+      "收纳",
+      "宿舍"
+    ],
+    "tags": [
+      "收纳",
+      "宿舍"
+    ],
+    "description": "透明抽屉式收纳柜 5层,主打收纳。"
+  },
+  {
+    "product_id": "P1049",
+    "name": "不锈钢炒锅 32cm",
+    "category": "厨具",
+    "price": 249,
+    "stock": 169,
+    "rating": 4.61,
+    "specs": [
+      "不粘",
+      "燃气通用"
+    ],
+    "tags": [
+      "不粘",
+      "燃气通用"
+    ],
+    "description": "不锈钢炒锅 32cm,主打不粘。"
+  },
+  {
+    "product_id": "P1050",
+    "name": "婴儿湿巾 80抽×6包",
+    "category": "母婴",
+    "price": 49,
+    "stock": 169,
+    "rating": 4.6,
+    "specs": [
+      "婴儿",
+      "无香"
+    ],
+    "tags": [
+      "婴儿",
+      "无香"
+    ],
+    "description": "婴儿湿巾 80抽×6包,主打婴儿。"
+  }
+]
