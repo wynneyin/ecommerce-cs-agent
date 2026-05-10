@@ -1,13 +1,7 @@
 """Streamlit demo for the e-commerce customer-service agent.
 
-Usage::
-
-    streamlit run apps/streamlit_app.py
-
-Layout (3 columns):
-* Left   — chat (user / assistant turns)
-* Middle — last action result rendered as a card (product / order / refund)
-* Right  — collapsible trace tree (per-node start/end with latency)
+* Tab「对话」: 面向用户，仅展示最终回复 + 思考中动画；可展开调试。
+* Tab「Debug」: 原有完整链路 / Trace / 工具卡片（未删减）。
 """
 
 from __future__ import annotations
@@ -32,6 +26,68 @@ st.set_page_config(page_title="电商客服 Agent", layout="wide")
 
 
 # ---------------------------------------------------------------------------
+# User-facing UI: CSS + thinking animation (runs in browser during blocking work)
+# ---------------------------------------------------------------------------
+
+USER_TAB_CSS = """
+<style>
+    .ec-hero-wrap { text-align:center; padding: 3rem 1rem 2rem; }
+    .ec-hero-title {
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 600;
+        color: #111;
+        letter-spacing: 0.02em;
+        margin-bottom: 0.5rem;
+    }
+    .ec-sub { color: #6b7280; font-size: 0.9rem; }
+    @keyframes ec-bounce {
+        0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+        40% { transform: translateY(-10px); opacity: 1; }
+    }
+    @keyframes ec-shimmer {
+        0% { background-position: -120% center; }
+        100% { background-position: 220% center; }
+    }
+    .ec-thinking-row {
+        display: flex; align-items: center; gap: 14px;
+        padding: 14px 18px; margin: 8px 0;
+        border-radius: 14px;
+        background: linear-gradient(90deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%);
+        background-size: 200% 100%;
+        animation: ec-shimmer 2.2s ease-in-out infinite;
+        border: 1px solid #e5e7eb;
+    }
+    .ec-dots { display: flex; gap: 6px; align-items: center; }
+    .ec-dot {
+        width: 9px; height: 9px; border-radius: 50%;
+        background: #6366f1;
+        animation: ec-bounce 0.9s ease-in-out infinite;
+    }
+    .ec-dot:nth-child(2) { animation-delay: 0.15s; background: #8b5cf6; }
+    .ec-dot:nth-child(3) { animation-delay: 0.3s; background: #a855f7; }
+    .ec-thinking-label {
+        font-size: 0.95rem;
+        color: #374151;
+        font-weight: 500;
+    }
+    div[data-testid="stChatInput"] textarea::placeholder {
+        color: #9ca3af !important;
+    }
+</style>
+"""
+
+THINKING_HTML = (
+    USER_TAB_CSS
+    + """
+<div class="ec-thinking-row">
+  <div class="ec-dots"><div class="ec-dot"></div><div class="ec-dot"></div><div class="ec-dot"></div></div>
+  <span class="ec-thinking-label">正在理解您的问题，请稍候…</span>
+</div>
+"""
+)
+
+
+# ---------------------------------------------------------------------------
 # Sidebar / state
 # ---------------------------------------------------------------------------
 
@@ -42,9 +98,11 @@ def _init_session() -> None:
     if "user_id" not in st.session_state:
         st.session_state.user_id = "demo"
     if "history" not in st.session_state:
-        st.session_state.history = []  # [{"role": str, "content": str, "state": dict|None}]
+        st.session_state.history = []
     if "pending_confirm" not in st.session_state:
-        st.session_state.pending_confirm = None  # tuple (user_query, payload)
+        st.session_state.pending_confirm = None
+    if "user_tab_show_debug" not in st.session_state:
+        st.session_state.user_tab_show_debug = False
 
 
 _init_session()
@@ -69,8 +127,12 @@ with st.sidebar:
         st.session_state.thread_id = str(uuid.uuid4())[:8]
         st.session_state.history.clear()
         st.session_state.pending_confirm = None
+        st.session_state.user_tab_show_debug = False
         st.rerun()
     st.markdown("---")
+    st.markdown(
+        "**对话页**仅显示助手最终回复；完整链路请切到 **Debug** 标签。"
+    )
     st.markdown(
         "**指标对照 (作品集级)**\n\n"
         "Intent / Slot / Tool / Args / Recall@K / Pipeline\n"
@@ -79,7 +141,7 @@ with st.sidebar:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (shared with Debug tab)
 # ---------------------------------------------------------------------------
 
 
@@ -125,7 +187,6 @@ def _render_action_card(action: dict | None) -> None:
     if name == "compare_products" and out.get("items"):
         items = out["items"]
         st.markdown(f"**对比 {len(items)} 款商品**")
-        keys = ["name", "category", "price", "rating", "tags", "specs"]
         rows = []
         for it in items:
             rows.append(
@@ -266,7 +327,6 @@ def _stage_display_name(stage: str) -> str:
 
 
 def _render_llm_response_body(stage: str, resp: str) -> None:
-    """NLU steps return JSON by design; others are prose."""
     if not resp.strip():
         st.caption("_(空)_")
         return
@@ -351,32 +411,43 @@ def _render_state_summary(state: dict) -> None:
         st.caption("**Memory:** " + ", ".join(f"{k}={v}" for k, v in state["memory_long"].items()))
 
 
-# ---------------------------------------------------------------------------
-# Layout
-# ---------------------------------------------------------------------------
+def _render_user_tab(mode: str, use_memory: bool) -> None:
+    """面向用户：仅最终回复 + 动画；可选展开调试。"""
+    st.markdown(USER_TAB_CSS, unsafe_allow_html=True)
 
+    if not st.session_state.history:
+        st.markdown(
+            '<div class="ec-hero-wrap"><div class="ec-hero-title">我们先从哪里开始呢？</div>'
+            '<div class="ec-sub">购物、订单、售后都可以问</div></div>',
+            unsafe_allow_html=True,
+        )
 
-col_chat, col_action, col_trace = st.columns([2, 2, 1.6], gap="large")
+    c1, c2, c3 = st.columns([1, 1, 1])
+    with c2:
+        if st.button(
+            "🔧 打开调试详情（本页展开）",
+            use_container_width=True,
+            help="展示与 Debug 标签相同的链路信息（本轮最后一条回复）",
+        ):
+            st.session_state.user_tab_show_debug = not st.session_state.user_tab_show_debug
+            st.rerun()
 
+    st.caption("也可直接切换到顶部 **Debug** 标签查看完整面板。")
 
-# Chat history
-with col_chat:
-    st.subheader("对话")
     for entry in st.session_state.history:
         with st.chat_message(entry["role"]):
             st.markdown(entry["content"])
-            if entry.get("state") and entry["role"] == "assistant":
-                _render_state_summary(entry["state"])
 
-    # Confirm button if pending
     if st.session_state.pending_confirm:
         with st.chat_message("assistant"):
             payload = st.session_state.pending_confirm[1]
-            st.warning("检测到敏感操作,需要您确认")
+            st.warning("该操作需要您确认后继续")
             st.json(payload)
             cols = st.columns(2)
-            if cols[0].button("确认提交", use_container_width=True):
+            if cols[0].button("确认提交", use_container_width=True, key="user_ap"):
                 user_query = st.session_state.pending_confirm[0]
+                thinking_ph = st.empty()
+                thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
                 state = run_turn(
                     user_query,
                     user_id=st.session_state.user_id,
@@ -385,6 +456,7 @@ with col_chat:
                     use_memory=use_memory,
                     confirm_decision="approve",
                 )
+                thinking_ph.empty()
                 st.session_state.history.append(
                     {
                         "role": "assistant",
@@ -394,8 +466,10 @@ with col_chat:
                 )
                 st.session_state.pending_confirm = None
                 st.rerun()
-            if cols[1].button("取消", use_container_width=True):
+            if cols[1].button("取消", use_container_width=True, key="user_rj"):
                 user_query = st.session_state.pending_confirm[0]
+                thinking_ph = st.empty()
+                thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
                 state = run_turn(
                     user_query,
                     user_id=st.session_state.user_id,
@@ -404,6 +478,7 @@ with col_chat:
                     use_memory=use_memory,
                     confirm_decision="reject",
                 )
+                thinking_ph.empty()
                 st.session_state.history.append(
                     {
                         "role": "assistant",
@@ -414,9 +489,11 @@ with col_chat:
                 st.session_state.pending_confirm = None
                 st.rerun()
 
-    user_query = st.chat_input("请输入您的问题(例如: 推荐 5000 元的笔记本 / 订单 E202603000001 物流)")
+    user_query = st.chat_input("有问题，尽管问")
     if user_query:
         st.session_state.history.append({"role": "user", "content": user_query, "state": None})
+        thinking_ph = st.empty()
+        thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
         state = run_turn(
             user_query,
             user_id=st.session_state.user_id,
@@ -424,51 +501,151 @@ with col_chat:
             mode=mode,
             use_memory=use_memory,
         )
+        thinking_ph.empty()
         if state.get("confirm_required"):
             st.session_state.pending_confirm = (user_query, state.get("confirm_payload"))
-            st.session_state.history.append(
-                {
-                    "role": "assistant",
-                    "content": state.get("final_response", ""),
-                    "state": state,
-                }
-            )
-        else:
-            st.session_state.history.append(
-                {
-                    "role": "assistant",
-                    "content": state.get("final_response", ""),
-                    "state": state,
-                }
-            )
+        st.session_state.history.append(
+            {
+                "role": "assistant",
+                "content": state.get("final_response", ""),
+                "state": state,
+            }
+        )
         st.rerun()
 
-
-with col_action:
-    st.subheader("工具结果")
-    if st.session_state.history:
+    if st.session_state.user_tab_show_debug:
         latest = next(
             (h for h in reversed(st.session_state.history) if h.get("state")),
             None,
         )
         if latest and latest.get("state"):
-            _render_action_card(_latest_action(latest["state"]))
+            with st.expander("🔧 调试详情（本轮最后一条助手回复对应的状态）", expanded=True):
+                _render_state_summary(latest["state"])
         else:
-            st.info("暂无")
-    else:
-        st.info("等待用户输入…")
+            st.info("尚无带状态的回复，发一条消息后再展开。")
 
 
-with col_trace:
-    st.subheader("Trace")
-    if st.session_state.history:
-        latest = next(
-            (h for h in reversed(st.session_state.history) if h.get("state")),
-            None,
-        )
-        if latest and latest.get("state"):
-            _render_trace(latest["state"].get("trace") or [])
+# ---------------------------------------------------------------------------
+# Tabs: 对话 | Debug
+# ---------------------------------------------------------------------------
+
+tab_user, tab_debug = st.tabs(["对话", "Debug"])
+
+with tab_user:
+    _render_user_tab(mode, use_memory)
+
+with tab_debug:
+    col_chat, col_action, col_trace = st.columns([2, 2, 1.6], gap="large")
+
+    with col_chat:
+        st.subheader("对话")
+        for entry in st.session_state.history:
+            with st.chat_message(entry["role"]):
+                st.markdown(entry["content"])
+                if entry.get("state") and entry["role"] == "assistant":
+                    _render_state_summary(entry["state"])
+
+        if st.session_state.pending_confirm:
+            with st.chat_message("assistant"):
+                payload = st.session_state.pending_confirm[1]
+                st.warning("检测到敏感操作,需要您确认")
+                st.json(payload)
+                cols = st.columns(2)
+                if cols[0].button("确认提交", use_container_width=True, key="dbg_ap"):
+                    user_query = st.session_state.pending_confirm[0]
+                    state = run_turn(
+                        user_query,
+                        user_id=st.session_state.user_id,
+                        thread_id=st.session_state.thread_id,
+                        mode=mode,
+                        use_memory=use_memory,
+                        confirm_decision="approve",
+                    )
+                    st.session_state.history.append(
+                        {
+                            "role": "assistant",
+                            "content": state.get("final_response", ""),
+                            "state": state,
+                        }
+                    )
+                    st.session_state.pending_confirm = None
+                    st.rerun()
+                if cols[1].button("取消", use_container_width=True, key="dbg_rj"):
+                    user_query = st.session_state.pending_confirm[0]
+                    state = run_turn(
+                        user_query,
+                        user_id=st.session_state.user_id,
+                        thread_id=st.session_state.thread_id,
+                        mode=mode,
+                        use_memory=use_memory,
+                        confirm_decision="reject",
+                    )
+                    st.session_state.history.append(
+                        {
+                            "role": "assistant",
+                            "content": "已取消该操作。",
+                            "state": state,
+                        }
+                    )
+                    st.session_state.pending_confirm = None
+                    st.rerun()
+
+        with st.form("debug_turn_form", clear_on_submit=True):
+            user_query_d = st.text_input(
+                "调试发送（与对话页共用会话 thread）",
+                placeholder="例如: 推荐 5000 元的笔记本 / 订单 E202603000001 物流",
+                label_visibility="collapsed",
+            )
+            submitted = st.form_submit_button("发送（Debug）")
+        if submitted and user_query_d.strip():
+            st.session_state.history.append(
+                {"role": "user", "content": user_query_d.strip(), "state": None}
+            )
+            state = run_turn(
+                user_query_d.strip(),
+                user_id=st.session_state.user_id,
+                thread_id=st.session_state.thread_id,
+                mode=mode,
+                use_memory=use_memory,
+            )
+            if state.get("confirm_required"):
+                st.session_state.pending_confirm = (
+                    user_query_d.strip(),
+                    state.get("confirm_payload"),
+                )
+            st.session_state.history.append(
+                {
+                    "role": "assistant",
+                    "content": state.get("final_response", ""),
+                    "state": state,
+                }
+            )
+            st.rerun()
+
+    with col_action:
+        st.subheader("工具结果")
+        if st.session_state.history:
+            latest = next(
+                (h for h in reversed(st.session_state.history) if h.get("state")),
+                None,
+            )
+            if latest and latest.get("state"):
+                _render_action_card(_latest_action(latest["state"]))
+            else:
+                st.info("暂无")
+        else:
+            st.info("等待用户输入…")
+
+    with col_trace:
+        st.subheader("Trace")
+        if st.session_state.history:
+            latest = next(
+                (h for h in reversed(st.session_state.history) if h.get("state")),
+                None,
+            )
+            if latest and latest.get("state"):
+                _render_trace(latest["state"].get("trace") or [])
+            else:
+                st.caption("(empty)")
         else:
             st.caption("(empty)")
-    else:
-        st.caption("(empty)")
