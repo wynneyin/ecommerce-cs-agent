@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.config import DATA_DIR
+from src.tools.product_taxonomy import enrich_product_record
 
 
 @lru_cache(maxsize=1)
@@ -15,7 +16,8 @@ def load_products() -> list[dict]:
     path = DATA_DIR / "products.json"
     if not path.exists():
         return []
-    return json.loads(path.read_text(encoding="utf-8"))
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return [enrich_product_record(dict(p)) for p in raw]
 
 
 @lru_cache(maxsize=1)

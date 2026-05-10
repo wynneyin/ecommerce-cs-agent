@@ -24,6 +24,7 @@ uvicorn>=0.30.0
 
 # Tools (optional but recommended for web_search)
 duckduckgo-search>=6.0.0
+tavily-python>=0.3.0
 
 # Utilities
 pydantic>=2.7.0

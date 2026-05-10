@@ -18,6 +18,41 @@ bash scripts/deploy_server.sh
 - `--skip-index`：跳过 `build_index.py`（省时间或离线环境）
 - `--restart`：先停再起（适合拉代码更新后）
 
+### 外网访问不了（最常见原因）
+
+脚本默认 **`BIND_HOST=0.0.0.0`**，会从所有网卡接受连接。若浏览器一直打不开，按顺序检查：
+
+1. **`.env` 里是否写了 `BIND_HOST=127.0.0.1`**  
+   只对本机开放，外网永远进不来。删掉该行或改为：
+   ```bash
+   export BIND_HOST=0.0.0.0
+   bash scripts/stop_local_services.sh && bash scripts/run_local_services.sh
+   ```
+
+2. **云服务器安全组 / 防火墙**  
+   需在控制台放行 **入方向 TCP `8501`**（以及若要用 API 则 **`8000`**）。本机 Linux 若开了 `ufw`：
+   ```bash
+   sudo ufw allow 8501/tcp
+   sudo ufw allow 8000/tcp
+   sudo ufw reload
+   ```
+
+3. **确认进程在监听**（SSH 登录服务器执行）：
+   ```bash
+   ss -tlnp | grep -E '8501|8000'
+   ```
+   应看到 `0.0.0.0:8501` 而不是只剩 `127.0.0.1:8501`。
+
+4. **浏览器地址**  
+   使用云厂商分配的 **公网 IP**：`http://公网IP:8501`（HTTP，不是 https，除非你已在前面加了 Nginx 证书）。
+
+5. **看 Streamlit 是否报错退出**  
+   ```bash
+   tail -n 80 .logs/streamlit.log
+   ```
+
+生产环境更稳妥的做法：只监听 `127.0.0.1`，用 **Nginx/Caddy 在 443** 反代到 8501（见 `deploy/nginx-example.conf`），既方便 HTTPS，也避免非标准端口被运营商拦截。
+
 ---
 
 ## 1. 准备

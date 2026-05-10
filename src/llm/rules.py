@@ -177,7 +177,8 @@ def run_nlu(text: str) -> dict[str, Any]:
         slots["quantity"] = int(qty.group(1))
 
     # 3. category / topic hint
-    for cat in ("手机", "笔记本", "电脑", "耳机", "音箱", "相机", "平板", "手表", "鞋", "服装", "面膜"):
+    # 「平板」须在「电脑」之前，避免「平板电脑」被误标成电脑
+    for cat in ("手机", "笔记本", "平板", "电脑", "耳机", "音箱", "相机", "手表", "鞋", "服装", "面膜"):
         if cat in raw:
             slots["category"] = cat
             break

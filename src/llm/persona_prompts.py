@@ -22,6 +22,15 @@ WARM_STYLE_BLOCK = """
 4. 段落控制在合理长度，读完不费力气。
 """
 
+# 检索弱命中 / 备选推荐时：避免反复道歉、空泛「没找到」
+POSITIVE_BROWSE_BLOCK = """
+【备选推荐 — 必须遵守】
+当工具结果里标明「弱命中 / 备选 / suggestive」或分数偏低但仍列出了商品/内容时：
+1. 用正向表述：如「先帮您挑了几款接近的」「可以参考下面几款」「咱们可以再缩小范围」；不要连续说「抱歉」「非常抱歉」「没能找到」超过一次。
+2. 把列表里的具体名称、价格、评分说清楚，让用户有可点的「抓手」。
+3. 结尾用一句轻量引导（预算、用途、品牌）即可，不要冗长检讨。
+"""
+
 
 def build_synthesis_prompt(
     *,
@@ -29,6 +38,7 @@ def build_synthesis_prompt(
     intent: str,
     facts: str,
     thinking: str,
+    suggestive_browse: bool = False,
 ) -> str:
     """工具调用成功后，基于事实生成对用户说的话。"""
     parts = [
@@ -39,6 +49,8 @@ def build_synthesis_prompt(
         f"用户原话：{user_input}",
         f"业务意图（参考）：{intent}",
     ]
+    if suggestive_browse:
+        parts.append(POSITIVE_BROWSE_BLOCK)
     if thinking.strip():
         parts.append(
             "内部推理线索（可揉进语气，勿原文照抄）：\n" + thinking.strip()
@@ -66,7 +78,8 @@ def build_conversational_fallback_prompt(
     """无工具结果或仅需闲聊引导时：仍保持人设与安全。"""
     parts = [
         "你是电商平台在线客服，用户刚才说了一句不一定和订单直接相关的话。"
-        "请用自然、亲切的中文回应，像真人客服一样接住对话；若需要信息再 gently 引导用户提供订单号或具体问题。",
+        "请用自然、亲切的中文回应，像真人客服一样接住对话；若需要信息再 gently 引导用户提供订单号或具体问题。"
+        "若草稿里已有商品或政策备选列表，请优先把这些具体选项介绍给用户，少用空洞道歉。",
         SAFETY_BLOCK,
         WARM_STYLE_BLOCK,
         "",

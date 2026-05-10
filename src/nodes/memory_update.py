@@ -23,11 +23,89 @@ from src.trace import traced_node
 _LONG_MEM = LongTermMemory()
 
 
+def _hot_product_browse_lines(n: int = 4) -> str:
+    """无严匹配时给用户提供可点的热卖备选（正反馈）。"""
+    from src.tools.data_loader import load_products
+
+    hot = sorted(load_products(), key=lambda p: p.get("rating", 0), reverse=True)[:n]
+    if not hot:
+        return ""
+    lines = "\n".join(
+        f"- {p['name']}（`{p['product_id']}`，¥{p['price']}，{p['rating']} 分）"
+        for p in hot
+    )
+    return "\n\n给您参考几款店里口碑不错的商品，您看看有没有接近的：\n" + lines
+
+
 def _truncate_facts(obj: Any, n: int = 3200) -> str:
     s = json.dumps(obj, ensure_ascii=False, default=str)
     if len(s) > n:
         return s[:n] + "…"
     return s
+
+
+_TOOL_TO_INTENT: dict[str, str] = {
+    "web_search": "web_search",
+    "search_products": "product_search",
+    "get_product_detail": "product_detail",
+    "compare_products": "product_compare",
+    "query_order": "order_query",
+    "refund_request": "refund_request",
+    "faq_retrieve": "faq_policy",
+}
+
+
+def _has_web_in_actions(actions: list[Any]) -> bool:
+    return any(a.get("name") == "web_search" for a in (actions or []) if isinstance(a, dict))
+
+
+def _bundle_tool_facts_for_synthesis(actions: list[Any], intent: str) -> tuple[str, bool]:
+    """多工具（如 web_search + search_products）合并进合成 prompt；返回 (facts, suggestive_browse)。"""
+    has_web = _has_web_in_actions(actions)
+    if not has_web and len(actions) <= 1:
+        last = actions[-1] if actions else {}
+        lo = last.get("output") if isinstance(last, dict) else None
+        sug = intent == "product_search" and isinstance(lo, dict) and bool(lo.get("suggestive"))
+        return (_truncate_facts(lo) if lo is not None else "(无)", sug)
+    parts: list[str] = []
+    suggestive = False
+    for a in actions:
+        if not isinstance(a, dict) or not a.get("ok"):
+            continue
+        o = a.get("output")
+        if not isinstance(o, dict):
+            continue
+        n = a.get("name")
+        if n == "web_search":
+            slim = {
+                "query": o.get("query"),
+                "summary": o.get("summary"),
+                "items": (o.get("items") or [])[:8],
+            }
+            parts.append("【联网检索】" + _truncate_facts(slim, n=2000))
+        else:
+            parts.append(f"【{n}】" + _truncate_facts(o))
+        if n == "search_products" and o.get("suggestive"):
+            suggestive = True
+    return ("\n\n".join(parts) if parts else "(无)"), (suggestive or has_web)
+
+
+def _render_chained_tool_outputs(actions: list[Any]) -> str | None:
+    chunks: list[str] = []
+    for a in actions:
+        if not isinstance(a, dict) or not a.get("ok"):
+            continue
+        o = a.get("output")
+        if not isinstance(o, dict):
+            continue
+        name = a.get("name")
+        fk = _TOOL_TO_INTENT.get(name or "")
+        if not fk:
+            continue
+        t = _from_action_output(fk, o)
+        if t:
+            chunks.append(t)
+    return "\n\n".join(chunks) if chunks else None
 
 
 def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]]:
@@ -41,15 +119,14 @@ def _llm_synthesize_final(state: AgentState) -> tuple[str | None, dict[str, Any]
     user_input = state.get("user_input") or ""
     intent = state.get("intent") or "unknown"
     thinking = (state.get("thinking") or "").strip()
-    last = actions[-1] if actions else None
-    last_out = last.get("output") if isinstance(last, dict) else None
-    facts = _truncate_facts(last_out) if last_out is not None else "(本轮无工具 JSON 输出)"
+    facts, suggestive = _bundle_tool_facts_for_synthesis(actions, intent)
 
     prompt = build_synthesis_prompt(
         user_input=user_input,
         intent=intent,
         facts=facts,
         thinking=thinking,
+        suggestive_browse=suggestive,
     )
     try:
         llm = get_chat_model()
@@ -128,12 +205,25 @@ def _from_action_output(intent: str, out: dict) -> str | None:
     """Render a final response from the last successful tool output."""
     if intent == "product_search":
         items = out.get("items") or []
+        tier = str(out.get("match_tier") or "strong")
+        suggestive = bool(out.get("suggestive"))
         if not items:
-            return "这边筛了一圈暂时没有命中商品，要不您换个关键词或说说预算区间，我再帮您找找？"
-        return "为您找到以下商品:\n" + "\n".join(
-            f"- {it['name']}({it['product_id']}, {it['price']} 元, {it['rating']} 分)"
+            return (
+                "按您这句暂时没筛到严丝合缝的款，先给您看几款店里卖得好的作参考；"
+                "您补一句预算、品牌或用途，我帮您再精准缩一圈～"
+                + _hot_product_browse_lines(5)
+            )
+        lines = "\n".join(
+            f"- {it['name']}（`{it['product_id']}`，¥{it['price']}，{it['rating']} 分）"
             for it in items[:5]
         )
+        if tier in ("soft", "browse") or suggestive:
+            return (
+                "没有完全一致的严匹配，下面这些是和您描述比较接近或通过评分帮您挑的备选，可以先扫一眼；"
+                "您愿意的话再说说预算、品牌或用途，我能帮您缩得更准～\n\n"
+                + lines
+            )
+        return "为您找到以下商品：\n" + lines
 
     if intent == "product_detail":
         it = out.get("item") or {}
@@ -174,7 +264,10 @@ def _from_action_output(intent: str, out: dict) -> str | None:
     if intent == "faq_policy":
         items = out.get("items") or []
         if not items:
-            return "暂未找到相关政策,请补充更多细节。"
+            return (
+                "没匹配到单独的政策页，您可以换个说法（如运费、退换、发票）试试；"
+                "或直接说说您遇到的订单情况，我按场景帮您说明。"
+            )
         first = items[0]
         topic = first.get("metadata", {}).get("title") or first.get("id")
         from src.tools.data_loader import load_faq
@@ -242,6 +335,7 @@ def _fallback_response(state: AgentState) -> str:
 
     return (
         "这句我还没完全对上您的具体需求～可以说说订单号、商品类型或者遇到的现象，我帮您一步步看。"
+        + _hot_product_browse_lines(3)
     )
 
 
@@ -257,16 +351,31 @@ def _compose_final_response_bundle(
     actions = state.get("actions") or []
     last = actions[-1] if actions else None
 
-    if last and last.get("ok") and isinstance(last.get("output"), dict):
-        rendered = _from_action_output(intent, last["output"])
-        if rendered:
-            if SETTINGS.use_llm_conversational_fallback() and not SETTINGS.is_fake_llm():
-                conv, patch = _llm_conversational_reply(
-                    state, template_hint=rendered
-                )
-                if conv:
-                    return conv, patch
-            return rendered, {}
+    ok_tools = [
+        a
+        for a in actions
+        if isinstance(a, dict)
+        and a.get("ok")
+        and isinstance(a.get("output"), dict)
+        and _TOOL_TO_INTENT.get(a.get("name") or "")
+    ]
+    rendered: str | None = None
+    if len(ok_tools) > 1 or (_has_web_in_actions(actions) and len(ok_tools) >= 1):
+        rendered = _render_chained_tool_outputs(actions)
+    elif last and last.get("ok") and isinstance(last.get("output"), dict):
+        name = last.get("name")
+        fk = _TOOL_TO_INTENT.get(name or "")
+        if fk:
+            rendered = _from_action_output(fk, last["output"])
+        else:
+            rendered = _from_action_output(intent, last["output"])
+
+    if rendered:
+        if SETTINGS.use_llm_conversational_fallback() and not SETTINGS.is_fake_llm():
+            conv, patch = _llm_conversational_reply(state, template_hint=rendered)
+            if conv:
+                return conv, patch
+        return rendered, {}
 
     draft = _fallback_response(state)
     conv, patch = _llm_conversational_reply(state, template_hint=draft)

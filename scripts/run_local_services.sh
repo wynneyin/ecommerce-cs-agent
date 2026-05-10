@@ -36,6 +36,10 @@ fi
 echo "使用 Python: $PY"
 echo "API → http://${HOST}:${API_PORT}  （本机访问可把 BIND_HOST 设为 127.0.0.1）"
 echo "UI  → http://${HOST}:${UI_PORT}"
+if [[ "$HOST" == "127.0.0.1" ]]; then
+  echo ""
+  echo "提示: 当前 BIND_HOST=127.0.0.1，仅本机可访问；外网请使用 BIND_HOST=0.0.0.0 并在防火墙/安全组放行端口。"
+fi
 
 nohup "$PY" -m uvicorn apps.api_server:app \
   --host "$HOST" \

@@ -5,6 +5,7 @@ from src.retrieval.hybrid import (
     TopicPin,
     VectorIndex,
     rrf_fuse,
+    weighted_dual_fuse,
 )
 from src.retrieval.index_builder import get_retriever
 
@@ -15,5 +16,6 @@ __all__ = [
     "TopicPin",
     "VectorIndex",
     "rrf_fuse",
+    "weighted_dual_fuse",
     "get_retriever",
 ]

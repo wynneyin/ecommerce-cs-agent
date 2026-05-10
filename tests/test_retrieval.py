@@ -6,7 +6,7 @@ def test_topic_pin_pins_exact_topic():
     res = r.retrieve("七天无理由退货怎么操作", top_k=3)
     assert res, "expected hits"
     assert res[0]["id"] == "return_window"
-    assert r.last_method == "topic_pin"
+    assert r.last_method.startswith("topic_pin")
 
 
 def test_shipping_fee_pinned():

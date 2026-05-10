@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.config import SETTINGS
 from src.state import AgentState
 
 
@@ -13,8 +14,13 @@ def after_guardrails(state: AgentState) -> str:
 # After nlu — choose graph branch
 def after_nlu(state: AgentState) -> str:
     intent = state.get("intent") or "unknown"
-    if intent in {"unsafe", "smalltalk", "unknown"}:
+    if intent in {"unsafe", "smalltalk"}:
         return "shortcut"
+    # 允许「未分类」走 think→plan，由模型决定是否仅调用 web_search
+    if intent == "unknown" and not SETTINGS.use_llm_web_tool():
+        return "shortcut"
+    if intent == "unknown" and SETTINGS.use_llm_web_tool():
+        return "plan"
     if intent == "memory_recall":
         return "shortcut"
     if intent == "faq_policy":

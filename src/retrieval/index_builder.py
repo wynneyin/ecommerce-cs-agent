@@ -31,8 +31,10 @@ def _faq_docs() -> list[Doc]:
 def _product_docs() -> list[Doc]:
     out: list[Doc] = []
     for p in load_products():
+        rtags = " ".join(map(str, p.get("retrieval_tags", [])))
         text = (
-            f"{p['name']} {p['category']} {' '.join(map(str, p.get('tags', [])))} "
+            f"{p['name']} {p['category']} {rtags} "
+            f"{' '.join(map(str, p.get('tags', [])))} "
             f"{' '.join(map(str, p.get('specs', [])))} {p.get('description', '')}"
         )
         out.append(
@@ -44,6 +46,7 @@ def _product_docs() -> list[Doc]:
                     "category": p["category"],
                     "price": p["price"],
                     "tags": p.get("tags", []),
+                    "retrieval_tags": p.get("retrieval_tags", []),
                     "source": "product",
                 },
             )

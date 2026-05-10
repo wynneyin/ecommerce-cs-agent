@@ -1,16 +1,11 @@
-"""Hybrid retriever (BM25 + Vector + RRF) with optional Topic-Pin layer.
+"""Hybrid retriever：BM25 + 向量双路召回，加权融合 + 可选 CrossEncoder 重排 + Topic-Pin。
 
-Implementation notes
---------------------
-* BM25: in-process implementation (no external dependency required) over the
-  jieba-tokenised document texts.
-* Vector: built on top of ``HashEmbeddings`` by default; cosine similarity is
-  done with a tiny numpy-backed brute force search. If a Chroma vector store
-  is available it is used instead (transparent to callers).
-* RRF: standard reciprocal rank fusion ``score = sum(1 / (k + rank))``.
-* Topic-Pin: for FAQ documents, queries that hit a document's `topic` /
-  `keywords` metadata are *boosted to the top of the result list* before the
-  RRF result is appended. This is the trick that takes FAQ Recall@K to 100%.
+* **BM25**：jieba 分词后的 in-process 检索。
+* **向量**：默认 ``HashEmbeddings`` + 余弦；可换真实 embedding 做语义召回。
+* **融合**：各路分数 min-max 归一化后线性加权，默认 **向量 0.7 + BM25 0.3**（``RETRIEVAL_VEC_WEIGHT`` / ``RETRIEVAL_BM25_WEIGHT``）。
+* **RRF**：仍保留函数 ``rrf_fuse`` 供对比或外部调用。
+* **Rerank**：若设置 ``RERANKER_MODEL``（如 cross-encoder 模型名），对融合后前若干条做 CrossEncoder 打分重排。
+* **Topic-Pin**（FAQ）：命中 topic/keywords 的文档置顶，其后接融合（及 rerank）结果。
 """
 
 from __future__ import annotations
@@ -20,7 +15,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.config import SETTINGS
 from src.retrieval.tokenizer import tokenize
+
+_cross_encoder_cache: dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +138,88 @@ def rrf_fuse(
 
 
 # ---------------------------------------------------------------------------
+# Weighted score fusion (vector + BM25)
+# ---------------------------------------------------------------------------
+
+
+def _min_max_norm(score_by_id: dict[str, float]) -> dict[str, float]:
+    if not score_by_id:
+        return {}
+    vals = list(score_by_id.values())
+    lo, hi = min(vals), max(vals)
+    if hi - lo < 1e-12:
+        return {k: 1.0 for k in score_by_id}
+    return {k: (v - lo) / (hi - lo) for k, v in score_by_id.items()}
+
+
+def weighted_dual_fuse(
+    bm25_ranked: list[tuple[Doc, float]],
+    vec_ranked: list[tuple[Doc, float]],
+    *,
+    vec_weight: float,
+    bm25_weight: float,
+    pool_limit: int,
+) -> list[tuple[Doc, float]]:
+    """双路分数各自 min-max 后加权求和；仅出现在一路上的文档，另一路视为 0。"""
+    bm_map = {doc.id: sc for doc, sc in bm25_ranked}
+    vec_map = {doc.id: sc for doc, sc in vec_ranked}
+    id_to_doc: dict[str, Doc] = {}
+    for doc, _ in bm25_ranked:
+        id_to_doc[doc.id] = doc
+    for doc, _ in vec_ranked:
+        id_to_doc[doc.id] = doc
+
+    bm_n = _min_max_norm(dict(bm_map))
+    vec_n = _min_max_norm(dict(vec_map))
+    all_ids = set(bm_map) | set(vec_map)
+    fused: list[tuple[Doc, float]] = []
+    for did in all_ids:
+        doc = id_to_doc[did]
+        v = vec_n.get(did, 0.0)
+        b = bm_n.get(did, 0.0)
+        fused.append((doc, vec_weight * v + bm25_weight * b))
+    fused.sort(key=lambda x: x[1], reverse=True)
+    return fused[:pool_limit]
+
+
+def _get_cross_encoder(model_name: str) -> Any:
+    if model_name not in _cross_encoder_cache:
+        from sentence_transformers import CrossEncoder  # type: ignore[import-untyped]
+
+        _cross_encoder_cache[model_name] = CrossEncoder(model_name)
+    return _cross_encoder_cache[model_name]
+
+
+def cross_encoder_rerank(
+    query: str,
+    ranked: list[tuple[Doc, float]],
+    *,
+    model_name: str,
+    top_k: int,
+) -> list[tuple[Doc, float]]:
+    """对前若干条用 CrossEncoder(query, doc) 重排；分数为归一化后的相关性分。"""
+    if not model_name or len(ranked) <= 1:
+        return ranked
+    pool_n = min(len(ranked), max(top_k * 4, 20))
+    pool = ranked[:pool_n]
+    tail = ranked[pool_n:]
+    try:
+        ce = _get_cross_encoder(model_name)
+    except Exception:
+        return ranked
+    pairs = [[query, d.text[:2000]] for d, _ in pool]
+    try:
+        raw = ce.predict(pairs, show_progress_bar=False, batch_size=16)
+    except Exception:
+        return ranked
+    raw_list = [float(x) for x in raw]
+    rn = _min_max_norm({pool[i][0].id: raw_list[i] for i in range(len(pool))})
+    order = sorted(range(len(pool)), key=lambda i: raw_list[i], reverse=True)
+    new_pool = [(pool[i][0], rn[pool[i][0].id]) for i in order]
+    return new_pool + tail
+
+
+# ---------------------------------------------------------------------------
 # Topic-Pin
 # ---------------------------------------------------------------------------
 
@@ -195,20 +275,42 @@ class HybridRetriever:
         self.bm25 = BM25(self.docs)
         self.vector = VectorIndex(self.docs, self.embeddings)
         self.pinner = TopicPin(self.docs) if self.use_topic_pin else None
-        self.last_method: str = "rrf"
+        self.last_method: str = "weighted_fusion"
 
     def retrieve(self, query: str, top_k: int = 5) -> list[dict]:
-        bm = self.bm25.search(query, top_k=top_k * 2)
-        vec = self.vector.search(query, top_k=top_k * 2)
-        fused = rrf_fuse([bm, vec], top_k=top_k * 2)
+        recall_k = max(top_k * 2, 10)
+        bm = self.bm25.search(query, top_k=recall_k)
+        vec = self.vector.search(query, top_k=recall_k)
 
-        method = "rrf"
+        w_vec = float(SETTINGS.retrieval_vec_weight)
+        w_bm = float(SETTINGS.retrieval_bm25_weight)
+        s = w_vec + w_bm
+        if s > 1e-9:
+            w_vec, w_bm = w_vec / s, w_bm / s
+
+        pool_limit = max(recall_k, top_k * 2)
+        fused = weighted_dual_fuse(
+            bm,
+            vec,
+            vec_weight=w_vec,
+            bm25_weight=w_bm,
+            pool_limit=pool_limit,
+        )
+
+        method = "weighted_fusion"
+        rerank_model = (SETTINGS.reranker_model or "").strip()
+        if rerank_model:
+            fused = cross_encoder_rerank(
+                query, fused, model_name=rerank_model, top_k=top_k
+            )
+            method = "weighted_fusion+cross_encoder_rerank"
+
         results: list[tuple[Doc, float]] = []
 
         if self.pinner is not None:
             pinned = self.pinner.find(query)
             if pinned:
-                method = "topic_pin"
+                method = f"topic_pin+{method}"
                 seen: set[str] = set()
                 for d in pinned:
                     results.append((d, 999.0))  # sentinel score

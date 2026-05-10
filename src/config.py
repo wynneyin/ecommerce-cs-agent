@@ -35,6 +35,13 @@ def _bool(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _float(name: str, default: float) -> float:
+    try:
+        return float(_env(name, str(default)))
+    except ValueError:
+        return default
+
+
 @dataclass
 class Settings:
     # LLM
@@ -46,6 +53,9 @@ class Settings:
     # Embeddings
     embedding_provider: str = field(default_factory=lambda: _env("EMBEDDING_PROVIDER", "fake"))
     embedding_model: str = field(default_factory=lambda: _env("EMBEDDING_MODEL", ""))
+
+    # 联网搜索：设 TAVILY_API_KEY 则默认走 Tavily（见 https://www.tavily.com/ ）；WEB_SEARCH_BACKEND=duckduckgo 可强制 DuckDuckGo
+    tavily_api_key: str = field(default_factory=lambda: _env("TAVILY_API_KEY", ""))
 
     # Tracing
     langsmith_enabled: bool = field(default_factory=lambda: _bool("LANGSMITH_TRACING", False))
@@ -67,6 +77,12 @@ class Settings:
     # Defaults
     default_top_k: int = 5
     default_mode: str = "deterministic"
+
+    # Hybrid retrieval: dual recall score fusion (env overrides; 和归一化为 1)
+    retrieval_vec_weight: float = field(default_factory=lambda: _float("RETRIEVAL_VEC_WEIGHT", 0.7))
+    retrieval_bm25_weight: float = field(default_factory=lambda: _float("RETRIEVAL_BM25_WEIGHT", 0.3))
+    # 非空则对加权融合后的前若干条用 CrossEncoder 重排（需 sentence-transformers，首次会下载模型）
+    reranker_model: str = field(default_factory=lambda: _env("RERANKER_MODEL", ""))
 
     def is_fake_llm(self) -> bool:
         return self.llm_provider.lower() == "fake"
@@ -109,6 +125,21 @@ class Settings:
         if self.is_fake_llm():
             return False
         return _bool("USE_LLM_UNDERSTAND", True)
+
+    def use_llm_web_tool(self) -> bool:
+        """Plan 阶段由模型决定是否前置 ``web_search``（USE_LLM_WEB_TOOL）；fake 关闭。"""
+        if self.is_fake_llm():
+            return False
+        return _bool("USE_LLM_WEB_TOOL", True)
+
+    def web_search_backend(self) -> str:
+        """``tavily`` 或 ``duckduckgo``。有 Tavily 密钥且未强制 duckduckgo 时用 Tavily。"""
+        b = _env("WEB_SEARCH_BACKEND", "").lower()
+        if b == "duckduckgo":
+            return "duckduckgo"
+        if b == "tavily":
+            return "tavily" if self.tavily_api_key else "duckduckgo"
+        return "tavily" if self.tavily_api_key else "duckduckgo"
 
 
 SETTINGS = Settings()
