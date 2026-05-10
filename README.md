@@ -66,6 +66,14 @@ streamlit run apps/streamlit_app.py
 uvicorn apps.api_server:app --reload --port 8000
 ```
 
+### 服务器部署（Docker / systemd / Nginx）
+
+见 **[DEPLOY.md](DEPLOY.md)**。
+
+### 不用 Docker：本机后台跑 API + 界面
+
+一键部署：**`bash scripts/deploy_server.sh`**（详见 **[LOCAL.md](LOCAL.md)**）。
+
 ## 环境变量
 
 复制 `.env.example` 为 `.env`。默认 `LLM_PROVIDER=fake` 无需密钥。切换真实模型时设置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`，并将 `LLM_PROVIDER` 设为 `openai`（兼容 OpenAI API 的网关均可）。

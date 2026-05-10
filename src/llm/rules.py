@@ -21,6 +21,7 @@ INTENTS = [
     "order_query",
     "refund_request",
     "faq_policy",
+    "web_search",
     "memory_recall",
     "smalltalk",
     "unsafe",
@@ -104,6 +105,22 @@ FAQ_HOW_PREFIXES = (
     "多久",
 )
 MEMORY_KEYWORDS = ("刚才", "之前", "上次", "记得", "我说过", "刚说", "再来一次", "还是那个")
+WEB_SEARCH_PHRASES = (
+    "联网搜索",
+    "上网搜索",
+    "网上搜索",
+    "搜一下网上",
+    "上网搜",
+    "网上搜",
+    "搜一下网",
+    "网上查",
+    "查一下网络",
+    "百度一下",
+    "谷歌一下",
+    "必应搜索",
+    "search the web",
+    "google it",
+)
 UNSAFE_PATTERNS = (
     "炸药",
     "色情",
@@ -170,6 +187,13 @@ def run_nlu(text: str) -> dict[str, Any]:
         intent = "memory_recall"
         conf = 0.85
         return {"intent": intent, "intent_conf": conf, "slots": slots}
+
+    # 4b. 联网检索（不走站内商品索引）
+    if any(p in raw for p in WEB_SEARCH_PHRASES) or any(
+        p in low for p in ("search the web", "web search")
+    ):
+        slots.setdefault("query", raw)
+        return {"intent": "web_search", "intent_conf": 0.88, "slots": slots}
 
     has_order_id = "order_id" in slots
     is_how_question = any(p in raw for p in FAQ_HOW_PREFIXES)
@@ -280,6 +304,13 @@ def plan_for_intent(intent: str, slots: dict[str, Any]) -> dict[str, Any]:
         )
     elif intent == "faq_policy":
         plan.append({"name": "faq_retrieve", "args": {"query": slots.get("query", "")}})
+    elif intent == "web_search":
+        plan.append(
+            {
+                "name": "web_search",
+                "args": {"query": (slots.get("query") or "").strip()},
+            }
+        )
     elif intent == "memory_recall":
         plan.append({"name": "memory_lookup", "args": {}})
     return {"plan": plan}

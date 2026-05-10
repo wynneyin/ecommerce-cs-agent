@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, Callable
 
 from src.graph.deterministic_graph import build_deterministic_graph
 from src.graph.react_graph import build_react_graph
@@ -30,6 +30,7 @@ def run_turn(
     use_memory: bool = True,
     confirm_decision: str | None = None,
     extra_state: dict[str, Any] | None = None,
+    stream_callback: Callable[[AgentState], None] | None = None,
 ) -> AgentState:
     """Run a single turn and return the final state.
 
@@ -37,6 +38,10 @@ def run_turn(
     enables short-term memory across turns. When ``use_memory`` is False the
     long-term memory is not loaded (used to compute the resume's *Memory Off*
     baseline).
+
+    If ``stream_callback`` is set, the graph is executed via ``stream`` and the
+    callback receives the full state snapshot after each completed step (for
+    live UI such as Streamlit).
     """
     graph = get_graph(mode, with_checkpointer=True)
     state = initial_state(user_input, user_id=user_id, mode=mode)
@@ -58,7 +63,16 @@ def run_turn(
     else:
         config["configurable"] = {"thread_id": state["run_id"]}
 
-    final_state = graph.invoke(state, config=config)
+    if stream_callback is None:
+        final_state = graph.invoke(state, config=config)
+        return final_state  # type: ignore[return-value]
+
+    final_state: AgentState | None = None
+    for snapshot in graph.stream(state, config=config, stream_mode="values"):
+        final_state = snapshot  # type: ignore[assignment]
+        stream_callback(snapshot)
+    if final_state is None:  # pragma: no cover - graph always yields at least once
+        raise RuntimeError("graph.stream produced no values")
     return final_state  # type: ignore[return-value]
 
 

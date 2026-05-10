@@ -22,6 +22,9 @@ streamlit>=1.36.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
 
+# Tools (optional but recommended for web_search)
+duckduckgo-search>=6.0.0
+
 # Utilities
 pydantic>=2.7.0
 python-dotenv>=1.0.1

@@ -21,7 +21,7 @@ def after_nlu(state: AgentState) -> str:
         return "retrieve"  # retrieval-first
     if intent in {"product_search", "product_detail", "product_compare"}:
         return "retrieve"
-    if intent in {"order_query", "refund_request"}:
+    if intent in {"order_query", "refund_request", "web_search"}:
         return "plan"  # tool-first, no retrieval
     return "shortcut"
 

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import html as html_module
 import json
 import os
 import sys
@@ -73,18 +74,152 @@ USER_TAB_CSS = """
     div[data-testid="stChatInput"] textarea::placeholder {
         color: #9ca3af !important;
     }
+    .ec-thinking-panel {
+        margin: 8px 0;
+        border-radius: 14px;
+        border: 1px solid #e5e7eb;
+        background: linear-gradient(180deg, #fafbff 0%, #f4f4f5 100%);
+        overflow: hidden;
+    }
+    .ec-thinking-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.88rem;
+        color: #374151;
+        font-weight: 600;
+        background: linear-gradient(90deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%);
+        background-size: 200% 100%;
+        animation: ec-shimmer 2.4s ease-in-out infinite;
+    }
+    .ec-feed-viewport {
+        height: 148px;
+        overflow: hidden;
+        position: relative;
+        background: rgba(15, 23, 42, 0.03);
+    }
+    .ec-feed-roll {
+        animation: ec-feed-marquee linear infinite;
+    }
+    @keyframes ec-feed-marquee {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-50%); }
+    }
+    .ec-feed-block {
+        padding: 10px 14px 14px;
+    }
+    .ec-feed-line {
+        font-size: 0.82rem;
+        line-height: 1.55;
+        color: #334155;
+        border-left: 3px solid #818cf8;
+        padding-left: 10px;
+        margin-bottom: 8px;
+        word-break: break-word;
+    }
 </style>
 """
 
-THINKING_HTML = (
-    USER_TAB_CSS
-    + """
-<div class="ec-thinking-row">
-  <div class="ec-dots"><div class="ec-dot"></div><div class="ec-dot"></div><div class="ec-dot"></div></div>
-  <span class="ec-thinking-label">正在理解您的问题，请稍候…</span>
+
+def _live_thinking_lines(state: dict | None) -> list[str]:
+    """Readable lines from an in-flight AgentState snapshot (stream_callback)."""
+    if state is None:
+        return ["…正在接入编排…"]
+    lines: list[str] = []
+    for ev in state.get("trace") or []:
+        if ev.get("phase") != "end":
+            continue
+        node = ev.get("node", "?")
+        lat = float(ev.get("latency_ms") or 0.0)
+        lines.append(f"■ {node} · {lat:.1f} ms")
+
+    qu = (state.get("query_understanding") or "").strip()
+    if qu:
+        one = qu.replace("\n", " ").strip()
+        cap = 200
+        lines.append(
+            "Understand · "
+            + (one[:cap] + "…" if len(one) > cap else one)
+        )
+
+    trace_nodes_end = {
+        ev.get("node")
+        for ev in (state.get("trace") or [])
+        if ev.get("phase") == "end"
+    }
+    if "nlu" in trace_nodes_end:
+        intent = state.get("intent") or "unknown"
+        ic = float(state.get("intent_conf") or 0.0)
+        slots = state.get("slots") or {}
+        sk = ", ".join(f"{k}={v}" for k, v in list(slots.items())[:6])
+        tail = f" · {sk}" if sk else ""
+        lines.append(f"NLU · intent={intent} · conf={ic:.2f}{tail}")
+
+    th = (state.get("thinking") or "").strip()
+    if th:
+        one = th.replace("\n", " ").strip()
+        cap = 320
+        lines.append(
+            "Think · "
+            + (one[:cap] + "…" if len(one) > cap else one)
+        )
+
+    for a in (state.get("actions") or [])[-3:]:
+        nm = a.get("name", "?")
+        ok = a.get("ok")
+        ms = a.get("latency_ms", 0)
+        lines.append(f"工具 · {nm} · ok={ok} · {ms} ms")
+
+    rt = state.get("react_trace") or []
+    if rt:
+        step = rt[-1]
+        rnd = step.get("round", "?")
+        rr = (step.get("react_reasoning") or "").strip()
+        if rr:
+            one = rr.replace("\n", " ").strip()
+            cap = 240
+            lines.append(
+                f"Reflect · 轮次 {rnd} · "
+                + (one[:cap] + "…" if len(one) > cap else one)
+            )
+        else:
+            lines.append(
+                f"Reflect · 轮次 {rnd} · need_replan={step.get('need_replan')}"
+            )
+
+    if not lines:
+        lines.append("…编排启动中，请稍候…")
+    return lines
+
+
+def build_live_thinking_html(state: dict | None) -> str:
+    """对话页「思考中」面板：真实链路摘要 + 上行滚动动画。"""
+    raw_lines = _live_thinking_lines(state)
+    esc_lines = [html_module.escape(t) for t in raw_lines]
+    inner = "".join(f'<div class="ec-feed-line">{line}</div>' for line in esc_lines)
+    dur = min(42.0, max(12.0, len(raw_lines) * 2.8))
+    panel = f"""
+<div class="ec-thinking-panel">
+  <div class="ec-thinking-head">
+    <div class="ec-dots"><div class="ec-dot"></div><div class="ec-dot"></div><div class="ec-dot"></div></div>
+    <span class="ec-thinking-label">推理进行中 · 下方为实时上下文（向上滚动）</span>
+  </div>
+  <div class="ec-feed-viewport">
+    <div class="ec-feed-roll" style="animation-duration: {dur:.1f}s;">
+      <div class="ec-feed-block">{inner}</div>
+      <div class="ec-feed-block" aria-hidden="true">{inner}</div>
+    </div>
+  </div>
 </div>
 """
-)
+    return USER_TAB_CSS + panel
+
+
+def _thinking_stream_stub(ph: Any, snapshot: dict) -> None:
+    """Updates the Streamlit placeholder during ``run_turn(..., stream_callback=…)``."""
+    ph.markdown(build_live_thinking_html(snapshot), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +359,24 @@ def _render_action_card(action: dict | None) -> None:
             preview = out.get("preview") or {}
             st.warning("退款需要确认")
             st.json(preview)
+        return
+
+    if name == "web_search":
+        st.markdown(f"**联网检索** · query=`{(out.get('query') or '-')}`")
+        if out.get("hint"):
+            st.warning(out["hint"])
+        if out.get("summary"):
+            st.markdown(out["summary"])
+        if out.get("items"):
+            for it in out["items"][:8]:
+                title = it.get("title") or "(无标题)"
+                url = it.get("url") or ""
+                snip = it.get("snippet") or ""
+                with st.expander(title[:80]):
+                    st.caption(url)
+                    st.write(snip[:600])
+        elif out.get("ok") and not out.get("items"):
+            st.caption("本轮未返回摘要条目")
         return
 
     if name == "faq_retrieve" and out.get("items"):
@@ -447,7 +600,6 @@ def _render_user_tab(mode: str, use_memory: bool) -> None:
             if cols[0].button("确认提交", use_container_width=True, key="user_ap"):
                 user_query = st.session_state.pending_confirm[0]
                 thinking_ph = st.empty()
-                thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
                 state = run_turn(
                     user_query,
                     user_id=st.session_state.user_id,
@@ -455,6 +607,7 @@ def _render_user_tab(mode: str, use_memory: bool) -> None:
                     mode=mode,
                     use_memory=use_memory,
                     confirm_decision="approve",
+                    stream_callback=lambda s: _thinking_stream_stub(thinking_ph, s),
                 )
                 thinking_ph.empty()
                 st.session_state.history.append(
@@ -469,7 +622,6 @@ def _render_user_tab(mode: str, use_memory: bool) -> None:
             if cols[1].button("取消", use_container_width=True, key="user_rj"):
                 user_query = st.session_state.pending_confirm[0]
                 thinking_ph = st.empty()
-                thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
                 state = run_turn(
                     user_query,
                     user_id=st.session_state.user_id,
@@ -477,6 +629,7 @@ def _render_user_tab(mode: str, use_memory: bool) -> None:
                     mode=mode,
                     use_memory=use_memory,
                     confirm_decision="reject",
+                    stream_callback=lambda s: _thinking_stream_stub(thinking_ph, s),
                 )
                 thinking_ph.empty()
                 st.session_state.history.append(
@@ -493,13 +646,13 @@ def _render_user_tab(mode: str, use_memory: bool) -> None:
     if user_query:
         st.session_state.history.append({"role": "user", "content": user_query, "state": None})
         thinking_ph = st.empty()
-        thinking_ph.markdown(THINKING_HTML, unsafe_allow_html=True)
         state = run_turn(
             user_query,
             user_id=st.session_state.user_id,
             thread_id=st.session_state.thread_id,
             mode=mode,
             use_memory=use_memory,
+            stream_callback=lambda s: _thinking_stream_stub(thinking_ph, s),
         )
         thinking_ph.empty()
         if state.get("confirm_required"):

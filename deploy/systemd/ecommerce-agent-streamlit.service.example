@@ -1,0 +1,19 @@
+# 可选：Streamlit 独立服务（与 API 同机时常开）
+
+[Unit]
+Description=Ecommerce CS Agent Streamlit UI
+After=network.target ecommerce-agent.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/ecommerce-cs-agent
+EnvironmentFile=/opt/ecommerce-cs-agent/.env
+Environment=PYTHONPATH=/opt/ecommerce-cs-agent
+ExecStart=/opt/ecommerce-cs-agent/.venv/bin/streamlit run apps/streamlit_app.py --server.address 127.0.0.1 --server.port 8501 --browser.gatherUsageStats false
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

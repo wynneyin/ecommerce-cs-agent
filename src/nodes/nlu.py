@@ -30,7 +30,7 @@ def _maybe_llm_refine(state: AgentState, text: str, base: dict[str, Any]) -> tup
             "你是电商客服 NLU 模块,请基于用户问题只输出一个 JSON 对象: "
             '{"intent": str, "intent_conf": float, "slots": object}。\n'
             "intent 必须是: product_search / product_detail / product_compare / "
-            "order_query / refund_request / faq_policy / memory_recall / smalltalk / unknown\n"
+            "order_query / refund_request / faq_policy / web_search / memory_recall / smalltalk / unknown\n"
             f"用户问题: {text}"
         )
         llm = get_chat_model()
@@ -57,7 +57,7 @@ def _llm_primary_nlu(state: AgentState, text: str) -> tuple[dict[str, Any] | Non
         '键: "intent" (字符串), "intent_conf" (0到1的小数), "slots" (对象)。\n'
         "intent 必须是下列之一:\n"
         "product_search, product_detail, product_compare, order_query, refund_request, "
-        "faq_policy, memory_recall, smalltalk, unknown\n"
+        "faq_policy, web_search, memory_recall, smalltalk, unknown\n"
         "slots 尽量从原文抽取可用字段，不必填满；拿不准的不要编造，可省略键或使用空对象 {}。\n"
         "常见键示例: order_id, product_id, product_ids, category, budget, quantity, refund_reason, query。\n"
         f"用户原话: {text}"

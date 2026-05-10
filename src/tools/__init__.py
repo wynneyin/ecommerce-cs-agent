@@ -10,6 +10,7 @@ from src.tools.get_product_detail import get_product_detail
 from src.tools.query_order import query_order
 from src.tools.refund_request import refund_request
 from src.tools.search_products import search_products
+from src.tools.internet_search import web_search
 
 
 TOOL_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {
@@ -19,6 +20,7 @@ TOOL_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {
     "query_order": query_order,
     "refund_request": refund_request,
     "faq_retrieve": faq_retrieve,
+    "web_search": web_search,
 }
 
 SENSITIVE_TOOLS = {"refund_request"}

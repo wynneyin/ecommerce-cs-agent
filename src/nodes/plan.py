@@ -17,8 +17,8 @@ from src.trace import traced_node
 def plan_node(state: AgentState) -> dict:
     intent = state.get("intent") or "unknown"
     slots = dict(state.get("slots") or {})
-    # Inject query for searches / FAQ
-    if intent in {"product_search", "faq_policy"}:
+    # Inject query for searches / FAQ / web
+    if intent in {"product_search", "faq_policy", "web_search"}:
         slots.setdefault("query", state.get("user_input") or "")
     # For memory_recall, plan stays empty; final response comes from memory
     plan_obj = plan_for_intent(intent, slots)

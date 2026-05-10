@@ -163,6 +163,14 @@ def _from_action_output(intent: str, out: dict) -> str | None:
     if intent == "refund_request":
         return out.get("message") or "退款申请已受理。"
 
+    if intent == "web_search":
+        if not out.get("ok"):
+            return out.get("hint") or out.get("error") or "联网搜索暂时不可用，请稍后再试。"
+        summary = (out.get("summary") or "").strip()
+        if summary:
+            return "网上检索到以下参考（摘要）：\n" + summary
+        return "未检索到可用的网页摘要，您可以换个说法或关键词再试一次。"
+
     if intent == "faq_policy":
         items = out.get("items") or []
         if not items:
